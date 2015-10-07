@@ -23,9 +23,6 @@ def packet_hanlder(pkt):
        pktdump.write(pkt)
        pktdump.close()
 
-def test(pkt): 
-    print("ge")
-
 def print_usage():
     print("Usage: ./fworker interface")
     sys.exit(1)
@@ -44,4 +41,4 @@ if __name__ == "__main__":
         shutil.rmtree(interface)
     
     os.mkdir(interface)
-    sniff(iface=interface, prn=packet_hanlder, test, filter="ether src host b4:be:b1:6b:00:b5", store=0)
+    sniff(iface=interface, prn=packet_hanlder, filter="ether src host b4:be:b1:6b:00:b5", store=0)
