@@ -11,6 +11,6 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 * [python2][python2]
 * [scapy][scapy]
 
-[dpdk](http://dpdk.org/)
-[python2](https://www.python.org/download/releases/2.7.3/)
-[scapy](http://www.secdev.org/projects/scapy/)
+[dpdk]:http://dpdk.org/
+[python2]:https://www.python.org/download/releases/2.7.3/
+[scapy]:http://www.secdev.org/projects/scapy/
