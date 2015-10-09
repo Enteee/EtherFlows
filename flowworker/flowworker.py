@@ -7,13 +7,15 @@ import os
 import shutil
 from scapy.all import *
 
+flowgen_mac = "b4:be:b1:6b:00:b5"
+
 def packet_hanlder(pkt):
    #check for ether 
    if type(pkt) is Ether:
        #check dict
        dst = str(pkt.dst)
        if dst not in dicto:
-           sendp(Ether(dst="b4:be:b1:6b:00:b5", src=dst)/Raw("ENTE"),iface=interface,verbose=False)
+           sendp(Ether(dst=flowgen_mac, src=dst)/Raw("ENTE"),iface=interface,verbose=False)
            dicto[dst] = 0
         
 
@@ -41,4 +43,5 @@ if __name__ == "__main__":
         shutil.rmtree(interface)
     
     os.mkdir(interface)
-    sniff(iface=interface, prn=packet_hanlder, filter="ether src host b4:be:b1:6b:00:b5", store=0)
+    print("Start sniffing on Port "+interface)
+    sniff(iface=interface, prn=packet_hanlder, filter="ether src host "+flowgen_mac, store=0)
