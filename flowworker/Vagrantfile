@@ -1,0 +1,24 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure(2) do |config|
+    config.vm.box = "ubuntu/trusty64"
+    config.vm.provision "file", source: "sys/bashrc", destination: ".bashrc"
+    config.vm.provision "file", source: "sys/logstash.conf", destination: "logstash.conf"
+
+    config.vm.provider "virtualbox" do |v|
+        v.memory = 4096
+        v.cpus = 4
+    end
+
+    config.vm.network "forwarded_port", guest: 9200, host: 9200 # Elasticsearch
+    config.vm.network "forwarded_port", guest: 5601, host: 5601 # Kibana
+
+    config.vm.provision :shell, path: "sys/bootstrap_privileged.sh"
+
+    config.vm.provision :shell do |sh|
+        sh.path = "sys/bootstrap.sh"
+        sh.privileged = false
+    end
+
+end
