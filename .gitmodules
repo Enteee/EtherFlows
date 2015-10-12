@@ -1,0 +1,3 @@
+[submodule "logstash-input-pcap"]
+	path = logstash-input-pcap
+	url = https://github.com/Np2x/logstash-input-pcap.git
