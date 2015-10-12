@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 ##
+# Clone repositories
+## 
+git clone https://github.com/Np2x/logstash-input-pcap.git
+
+##
 # Services
 ##
 mkdir -p "${SERVICES}"
@@ -36,7 +41,7 @@ wget "https://download.elastic.co/kibana/kibana/${KIBANA_TAR}"
 tar -xvzf "${KIBANA_TAR}" -C "${SERVICES}"
 
 ##
-# Screen
+# Start services
 ##
 screen -d -m -S worksession
 export SCREEN_SESSION=$(screen -ls | sed -nre 's/\s*([0-9]+\.worksession).*/\1/p')

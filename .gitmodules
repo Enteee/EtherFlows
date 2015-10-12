@@ -1,3 +1,3 @@
 [submodule "logstash-input-pcap"]
-	path = logstash-input-pcap
+	path = flowworker/logstash-input-pcap
 	url = https://github.com/Np2x/logstash-input-pcap.git
