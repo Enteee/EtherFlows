@@ -10,8 +10,10 @@ from threading import Thread
 from Queue import Queue, Empty
 from scapy.all import *
 
-flowgen_mac = "b4:be:b1:6b:00:b5"
-m_finished = False
+#MAC Addr of the flow generator 
+FLOWGEN_MAC = "b4:be:b1:6b:00:b5"
+#Timeout const in seconds
+FLOW_TIMEOUT = 10
 
 class Flow:
     def __init__(self, dst):
@@ -38,7 +40,7 @@ def packet_handler(pkt):
        #check dict
        dst = str(pkt.dst)
        if dst not in flows:
-           sendp(Ether(dst=flowgen_mac, src=dst)/Raw("ENTE"),iface=interface,verbose=False)
+           sendp(Ether(dst=FLOWGEN_MAC, src=dst)/Raw("ENTE"),iface=interface,verbose=False)
            f = Flow(dst)
            flows[dst] = f
         
@@ -50,11 +52,9 @@ def flow_handler():
     to_remove = []
     i = 0;
     act_time = time.time()
-    print(act_time)
     for dst in flows:
        #check timeout
-       print(act_time - flows[dst].last_pkt)
-       if act_time - flows[dst].last_pkt > 10:
+       if act_time - flows[dst].last_pkt > FLOW_TIMEOUT:
            flows[dst].write()
            to_remove.append(dst)
        else:
@@ -67,16 +67,14 @@ def flow_handler():
         print("Amount of active flows: {}".format(i))
 
 def threaded_sniff_target(q):
-  global m_finished
-  sniff(iface=interface, filter="ether src host {0}".format(flowgen_mac), store=0, prn = lambda x : q.put(x))
-  m_finished = True
+  sniff(iface=interface, filter="ether src host {0}".format(FLOWGEN_MAC), store=0, prn = lambda x : q.put(x))
 
 def threaded_sniff():
   q = Queue.Queue()
   sniffer = Thread(target = threaded_sniff_target, args = (q,))
   sniffer.daemon = True
   sniffer.start()
-  while (not m_finished):
+  while (True):
     try:
       pkt = q.get(timeout = 1)
       packet_handler(pkt)
