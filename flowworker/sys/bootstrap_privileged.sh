@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-apt-get update
-apt-get install -y openjdk-7-jdk screen
+pacman --noconfirm -Syu
+pacman --noconfirm -S jdk7-openjdk screen rxvt-unicode-terminfo wireshark-cli libpcap tcpdump
 
 # Ruby bundler
 gem install bundler

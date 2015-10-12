@@ -2,7 +2,7 @@
 ##
 # Clone repositories
 ## 
-git clone https://github.com/Np2x/logstash-input-pcap.git
+git clone https://github.com/Enteee/EtherFlows.git
 
 ##
 # Services
