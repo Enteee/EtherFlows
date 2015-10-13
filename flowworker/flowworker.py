@@ -7,6 +7,7 @@ import os
 import shutil
 import time
 import signal
+import struct
 from threading import Thread
 from Queue import Queue, Empty
 from scapy.all import *
@@ -18,6 +19,21 @@ FLOW_TIMEOUT = 10
 MAX_PKT = 100
 running = True
 
+class PcapPacket:
+    def __init__(self, payload):
+        self.caplen = len(payload)
+        self.wirelen = self.caplen
+        t = time.time()
+        it = int(t)
+        self.sec = it
+        self.usec = int(round((t-it)*1000000))
+        self.payload = payload
+    def write(self):
+        sys.stdout.write(struct.pack("IIII",self.sec, self.usec, self.caplen, self.wirelen))
+        sys.stdout.write(str(self.payload))
+        sys.stdout.flush()
+        #print(self.payload)
+
 class Flow:
     def __init__(self, dst):
         self.pkts = []
@@ -25,28 +41,26 @@ class Flow:
         self.last_pkt = time.time()
     def write(self):
         if len(self.pkts) == 1:
-            print("Only init pkt recived, flow with dst_hash: {} not written".format(self.dst_hash))
+            #print("Only init pkt recived, flow with dst_hash: {} not written".format(self.dst_hash))
             return
 
-        i = 0
-        pktdump = PcapWriter(interface+"/"+self.dst_hash, append=True, sync=True)
         for pkt in self.pkts:
-            pktdump.write(pkt)
-            i += 1
-        pktdump.close()
-        print("Flow with dst_hash: {} written, included {} packets".format(self.dst_hash,i))
+            pkt.write()
+        #print("Flow with dst_hash: {} written, included {} packets".format(self.dst_hash,i))
 
 
 def packet_handler(pkt):
    #check for ether 
    if type(pkt) is Ether:
        #check dict
+       pcap = PcapPacket(pkt)
        dst = str(pkt.dst)
+       src = str(pkt.src)
        if dst not in flows:
-           sendp(Ether(dst=FLOWGEN_MAC, src=dst)/Raw("ENTE"),iface=interface,verbose=False)
+           sendp(Ether(dst=src, src=dst)/Raw("ENTE"),iface=interface,verbose=False)
            f = Flow(dst)
            flows[dst] = f
-       flows[dst].pkts.append(pkt)
+       flows[dst].pkts.append(pcap)
        flows[dst].last_pkt = time.time()
 
 def flow_handler():
@@ -74,7 +88,7 @@ def threaded_handler(q):
     except Empty:
       #no new pkts so we have time to handle the flows
       flow_handler()
-      print("Amount of active flows: {}".format(len(flows)))
+      #print("Amount of active flows: {}".format(len(flows)))
 
 
 def print_usage():
@@ -89,7 +103,6 @@ if __name__ == "__main__":
     q = Queue.Queue(maxsize=MAX_PKT)
 
     flows={}    
-    dicto={}
     if len(sys.argv) != 2:
         print_usage()
     else:
@@ -97,11 +110,16 @@ if __name__ == "__main__":
 
 
     if os.path.exists(interface):
-        print("dir exists, clear dir")
+        #print("dir exists, clear dir")
         shutil.rmtree(interface)
     
     os.mkdir(interface)
-    print("Start sniffing on Port "+interface)
+    #print("Start sniffing on Port "+interface)
+    #global hdr
+    hdr = struct.pack("IHHIIII", 0xa1b2c3d4L, 2, 4, 0, 0, MTU, 1)
+    sys.stdout.write(hdr)
+    sys.stdout.flush()
+
     sniffer = Thread(target = threaded_sniff_target, args = (q,))
     sniffer.start()
     handler = Thread(target = threaded_handler, args = (q,))
