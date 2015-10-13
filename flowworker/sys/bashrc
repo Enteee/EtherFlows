@@ -11,7 +11,7 @@ export ELASTIC_TAR=elasticsearch-1.5.2.tar.gz
 export MARVEL_FILENAME="marvel-latest.zip"
 
 export LOGSTASH_HOME=${SERVICES}/logstash*/
-export LOGSTASH_TAR=logstash-1.5.0.tar.gz
+export LOGSTASH_TAR=logstash-1.5.4.tar.gz
 
 export KIBANA_HOME=${SERVICES}/kibana*/
 export KIBANA_TAR=kibana-4.1.2-linux-x64.tar.gz
