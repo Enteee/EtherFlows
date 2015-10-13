@@ -56,12 +56,6 @@ if __name__ == "__main__":
     else:
         interface = str(sys.argv[1])
 
-
-    if os.path.exists(interface):
-        #print("dir exists, clear dir")
-        shutil.rmtree(interface)
-    
-    os.mkdir(interface)
     #global pcap hdr
     hdr = struct.pack("IHHIIII", 0xa1b2c3d4L, 2, 4, 0, 0, MTU, 1)
     sys.stdout.write(hdr)
