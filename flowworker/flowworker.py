@@ -1,13 +1,12 @@
 #! /usr/bin/env python2
 # vim: set fenc=utf8 ts=4 sw=4 et :
-#
-
 import sys
 import os
 import shutil
 import time
 import signal
 import struct
+import argparse
 from threading import Thread
 from Queue import Queue, Empty
 from scapy.all import *
@@ -19,6 +18,20 @@ FLOW_TIMEOUT = 10
 MAX_PKT = 100
 running = True
 
+#Set up argument parser
+parser = argparse.ArgumentParser(description='Flowworker')
+parser.add_argument('-m',
+                    default=FLOWGEN_MAC,
+                    type=str,
+                    dest='mac',
+                    help='MAC address of flows generated; Set to "all" if you want to capture all MACs [default: {}]'.format(FLOWGEN_MAC)
+                    )
+parser.add_argument('-i',
+                    required=True,
+                    type=str,
+                    dest='interface',
+                    help='Interface to listen on'
+                    )
 class PcapPacket:
     def __init__(self, payload):
         self.caplen = len(payload)
@@ -41,7 +54,7 @@ def packet_handler(pkt):
        dst = str(pkt.dst)
        src = str(pkt.src)
        if dst not in flows:
-           sendp(Ether(dst=src, src=dst)/Raw("ENTE"),iface=interface,verbose=False)
+           sendp(Ether(dst=src, src=dst)/Raw("ENTE"),iface=args.interface,verbose=False)
            flows[dst] = True
        pcap.write()
 
@@ -50,16 +63,19 @@ def print_usage():
     sys.exit(1)
 
 if __name__ == "__main__":
-    flows={}    
-    if len(sys.argv) != 2:
-        print_usage()
+    flows={}
+    args = parser.parse_args()
+    if args.mac != 'none':
+        bpfFilter = 'ether src host {}'.format(args.mac)
     else:
-        interface = str(sys.argv[1])
+        bpfFilter = ''
 
-    #global pcap hdr
+    #write global pcap hdr
     hdr = struct.pack("IHHIIII", 0xa1b2c3d4L, 2, 4, 0, 0, MTU, 1)
     sys.stdout.write(hdr)
     sys.stdout.flush()
-
-    sniff(iface=interface, filter="ether src host {0}".format(FLOWGEN_MAC), prn = packet_handler)
+    sniff(  iface=args.interface,
+            filter=bpfFilter,
+            prn = packet_handler
+    )
 

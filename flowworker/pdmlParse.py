@@ -1,4 +1,5 @@
 #! /usr/bin/env python2
+# vim: set fenc=utf8 ts=4 sw=4 et :
 import sys
 import json
 import xml.sax
