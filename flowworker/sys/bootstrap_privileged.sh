@@ -23,5 +23,10 @@ pacman --needed --noconfirm -S jdk7-openjdk screen rxvt-unicode-terminfo wiresha
 # Ruby bundler
 gem install bundler
 
-#Wireshark non root config
+# Wireshark non root config
 gpasswd -a vagrant wireshark
+
+# Enable all network interfaces
+for i in $(ip link show | sed -nre 's/[0-9]+: (.+?): .*/\1/p'); do
+    ip link set dev "${i}" up
+done
