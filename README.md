@@ -8,9 +8,9 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 1. Download & install [Vagrant][vagrant]
 2. Download & install [Virtualbox][virtualbox]
 * Make sure that you have the following modules loaded:
-** vboxdrv
-** vboxnetflt
-** vboxnetadp
+ * vboxdrv
+ * vboxnetflt
+ * vboxnetadp
 ```bash
 # cat << EOF > /etc/modules-load.d/virtualbox.conf
 vboxdrv
