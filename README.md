@@ -10,14 +10,18 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
  * vboxdrv
  * vboxnetflt
  * vboxnetadp
-     # cat << EOF > /etc/modules-load.d/virtualbox.conf
-     vboxdrv
-     vboxnetflt
-     vboxnetadp
-     EOF
+    ````
+    # cat << EOF > /etc/modules-load.d/virtualbox.conf
+    vboxdrv
+    vboxnetflt
+    vboxnetadp
+    EOF
+    ````
 3. Navigate to the flow worker directory
 4. Start the flow worker
+    ````
     $ vagrant up
+    ````
 5. Open http://localhost:5601
 6. Done!
 7. Join #EtherFlows @[freenode.net][freenode]
