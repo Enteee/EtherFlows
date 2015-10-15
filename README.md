@@ -39,7 +39,7 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 ### Flow Gen
 * [dpdk >= 2.1.0][dpdk]
 
-### Flow Woroker
+### Flow Worker
 * [python2][python2]
 * [scapy][scapy]
 
