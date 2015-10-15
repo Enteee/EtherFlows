@@ -4,6 +4,8 @@ _L2 powered flow processing._
 ## Idea
 With a mapping of RSS-generated flow hashes into MAC address-space we can achive simple flow distribution with switching hardware. The [Flow Gen][flowgen] program does the Flow -> MAC mapping, the [Flow worker][flowworker] implements a sample flow processor.
 
+![Set up](https://raw.githubusercontent.com/Enteee/EtherFlows/develop/doc/setup.png)
+
 ## Getting started
 1. Clone this repository
 
