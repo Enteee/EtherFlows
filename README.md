@@ -26,7 +26,7 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
     $ vagrant up
     ````
 
-5. Open http://localhost:5601
+5. Open [http://localhost:5601](http://localhost:5601)
 6. Done!
 7. Join #EtherFlows @[freenode.net][freenode]
 
