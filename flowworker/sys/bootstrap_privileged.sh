@@ -18,7 +18,7 @@ EOF
 
 # Update system
 pacman --noconfirm -Syu
-pacman --needed --noconfirm -S  jdk7-openjdk \
+pacman --needed --noconfirm -S  jdk8-openjdk \
                                 screen  \
                                 rxvt-unicode-terminfo \
                                 wireshark-cli \

@@ -14,9 +14,16 @@ class PdmlHandler( xml.sax.ContentHandler ):
         self.stars = ""
         self.description = ""
 
+    def boolify(self, s):
+        if s == 'True':
+            return True
+        if s == 'False':
+            return False
+        raise ValueError("Not a bool")
+
     # Try to convert variables into datatypes
     def autoconvert(self, s):
-        for fn in (bool, int, float):
+        for fn in (self.boolify, int, float):
             try:
                 return fn(s)
             except ValueError:
