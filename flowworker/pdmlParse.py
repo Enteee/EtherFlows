@@ -6,13 +6,6 @@ import xml.sax
 
 class PdmlHandler( xml.sax.ContentHandler ):
     def __init__(self):
-        self.CurrentData = ""
-        self.type = ""
-        self.format = ""
-        self.year = ""
-        self.rating = ""
-        self.stars = ""
-        self.description = ""
 
     def boolify(self, s):
         if s == 'True':
@@ -32,7 +25,6 @@ class PdmlHandler( xml.sax.ContentHandler ):
 
     # Call when an element starts
     def startElement(self, tag, attributes):
-        self.CurrentData = tag
         if tag == "packet":
             pkt.clear()
         else:
