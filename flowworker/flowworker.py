@@ -32,6 +32,11 @@ parser.add_argument('-i',
                     dest='interface',
                     help='Interface to listen on'
                     )
+parser.add_argument('-no',
+                    dest='no_answer',
+                    action="store_true",
+                    help='Dont answer packets'
+                    )
 class PcapPacket:
     def __init__(self, payload):
         self.caplen = len(payload)
@@ -41,26 +46,24 @@ class PcapPacket:
         self.sec = it
         self.usec = int(round((t-it)*1000000))
         self.payload = payload
+
     def write(self):
         sys.stdout.write(struct.pack("IIII",self.sec, self.usec, self.caplen, self.wirelen))
         sys.stdout.write(str(self.payload))
         sys.stdout.flush()
 
 def packet_handler(pkt):
-   #check for ether 
-   if type(pkt) is Ether:
-       #check dict
-       pcap = PcapPacket(pkt)
-       dst = str(pkt.dst)
-       src = str(pkt.src)
-       if dst not in flows:
-           sendp(Ether(dst=src, src=dst)/Raw("ENTE"),iface=args.interface,verbose=False)
-           flows[dst] = True
-       pcap.write()
-
-def print_usage():
-    print("Usage: ./fworker interface")
-    sys.exit(1)
+    #check for ether 
+    if type(pkt) is Ether:
+        #check dict
+        pcap = PcapPacket(pkt)
+        dst = str(pkt.dst)
+        src = str(pkt.src)
+        if not args.no_answer:
+            if dst not in flows:
+                sendp(Ether(dst=src, src=dst)/Raw("ENTE"),iface=args.interface,verbose=False)
+                flows[dst] = True
+        pcap.write()
 
 if __name__ == "__main__":
     flows={}
@@ -69,12 +72,12 @@ if __name__ == "__main__":
         bpfFilter = 'ether src host {}'.format(args.mac)
     else:
         bpfFilter = ''
-
     #write global pcap hdr
     hdr = struct.pack("IHHIIII", 0xa1b2c3d4L, 2, 4, 0, 0, MTU, 1)
     sys.stdout.write(hdr)
     sys.stdout.flush()
-    sniff(  iface=args.interface,
+    sniff(  
+            iface=args.interface,
             filter=bpfFilter,
             prn = packet_handler
     )
