@@ -6,6 +6,7 @@ import xml.sax
 
 class PdmlHandler( xml.sax.ContentHandler ):
     def __init__(self):
+        pass
 
     def boolify(self, s):
         if s == 'True':
