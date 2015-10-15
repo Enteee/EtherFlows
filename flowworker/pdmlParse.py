@@ -20,9 +20,9 @@ class PdmlHandler( xml.sax.ContentHandler ):
       if tag == "packet":
          pkt.clear()
       else:
-          if attributes.has_key("name") and attributes.has_key("showname"):
+          if attributes.has_key("name") and attributes.has_key("show"):
               name = attributes.getValue("name")
-              showname = attributes.getValue("showname")
+              showname = attributes.getValue("show")
               pkt[name] = showname
 
    # Call when an elements ends
