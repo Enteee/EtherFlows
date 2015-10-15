@@ -5,30 +5,33 @@ _L2 powered flow processing._
 With a mapping of RSS-generated flow hashes into MAC address-space we can achive simple flow distribution with switching hardware. The [Flow Gen][flowgen] program does the Flow -> MAC mapping, the [Flow worker][flowworker] implements a sample flow processor.
 
 ## Getting started
-1. Download & install [Vagrant][vagrant] and [Virtualbox][virtualbox]
-2. Make sure that you have the following modules loaded:
- * vboxdrv
- * vboxnetflt
- * vboxnetadp
+1. Clone this repository
 
-    ````sh
+    ```sh
+    $ git clone https://github.com/Enteee/EtherFlows.git
+    ```
+
+2. Download & install [Vagrant][vagrant] and [Virtualbox][virtualbox]
+3. Make sure that you have the following modules loaded:
+
+    ```sh
     # cat << EOF > /etc/modules-load.d/virtualbox.conf
     vboxdrv
     vboxnetflt
     vboxnetadp
     EOF
-    ````
+    ```
 
-3. Navigate to the flow worker directory
-4. Start the flow worker
+4. Navigate to the flow worker directory
+5. Start the flow worker
 
-    ````sh
+    ```sh
     $ vagrant up
-    ````
+    ```
 
-5. Open [http://localhost:5601](http://localhost:5601)
-6. Done!
-7. Join [#EtherFlows @freenode.net][irc]
+6. Open [http://localhost:5601](http://localhost:5601)
+7. Done!
+8. Join [#EtherFlows @freenode.net][irc]
 
 ## Requirments
 ### Flow Gen
