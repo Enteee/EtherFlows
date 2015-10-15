@@ -18,7 +18,17 @@ EOF
 
 # Update system
 pacman --noconfirm -Syu
-pacman --needed --noconfirm -S jdk7-openjdk screen rxvt-unicode-terminfo wireshark-cli libpcap tcpdump scapy wget ruby python2-configargparse
+pacman --needed --noconfirm -S  jdk7-openjdk \
+                                screen  \
+                                rxvt-unicode-terminfo \
+                                wireshark-cli \
+                                libpcap \
+                                tcpdump \
+                                scapy \
+                                wget \
+                                ruby \
+                                python2-configargparse \
+                                vim
 # Ruby bundler
 gem install bundler
 
