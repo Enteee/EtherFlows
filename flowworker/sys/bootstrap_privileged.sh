@@ -28,6 +28,7 @@ pacman --needed --noconfirm -S  jdk8-openjdk \
                                 wget \
                                 ruby \
                                 python2-configargparse \
+                                ntp \
                                 vim
 # Ruby bundler
 gem install bundler
@@ -35,3 +36,5 @@ gem install bundler
 # Wireshark non root config
 gpasswd -a vagrant wireshark
 
+# Start ntp service 
+systemctl start ntpd
