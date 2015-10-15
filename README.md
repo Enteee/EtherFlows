@@ -28,7 +28,7 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 
 5. Open [http://localhost:5601](http://localhost:5601)
 6. Done!
-7. Join #EtherFlows @[freenode.net][freenode]
+7. Join [#EtherFlows @freenode.net][irc]
 
 ## Requirments
 ### Flow Gen
@@ -46,4 +46,4 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 [scapy]:http://www.secdev.org/projects/scapy/
 [vagrant]:https://www.vagrantup.com/downloads.html
 [virtualbox]:https://www.virtualbox.org/
-[freenode]:https://freenode.net/
+[irc]:http://webchat.freenode.net/?nick=newEtherFlowsUser&channels=EtherFlows
