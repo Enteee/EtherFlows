@@ -10,6 +10,7 @@ screen -S ${SCREEN_SESSION} -X screen -t "elasticsearch"
 screen -S ${SCREEN_SESSION} -p "elasticsearch" -X stuff $"${ELASTIC_HOME}/bin/elasticsearch\n"
 
 screen -S ${SCREEN_SESSION} -X screen -t "logstash"
+screen -S ${SCREEN_SESSION} -p "logstash" -X stuff $"newgrp wireshark\n"
 screen -S ${SCREEN_SESSION} -p "logstash" -X stuff $"${LOGSTASH_HOME}/bin/logstash -f /vagrant/logstash.conf\n"
 
 screen -S ${SCREEN_SESSION} -X screen -t "kibana"
