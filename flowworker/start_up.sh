@@ -121,7 +121,7 @@ for i in ${INTERFACES}; do
             interface=$(tr -d " " <<< ${i})
             hostname="$(hostname).${interface}"
             echo ${hostname}
-            sed -i "s/vm.hostname = \"flow_worker\"/vm.hostname = \"${hostname}\"/g" Vagrantfile
+            sed -i "s/vm.hostname = \"flowworker\"/vm.hostname = \"${hostname}\"/g" Vagrantfile
 
             vagrant destroy -f
             vagrant up
