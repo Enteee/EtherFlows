@@ -82,8 +82,9 @@ for i in ${INTERFACES}; do
         rm -rf "${instance}"
         if ! ${STOP}; then
             # create directory structure
-            find "${WORK_DIR}" -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
-            find "${WORK_DIR}" -path "${INSTANCE_DIR}" -prune -o -type f -exec cp {} "${instance}/{}" \;
+            cd "${WORK_DIR}"
+            find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
+            find . -path "${INSTANCE_DIR}" -prune -o -type f -exec cp {} "${instance}/{}" \;
             cd "${instance}"
             sed -i -- "s/auto_config: false/auto_config: false, bridge: \"${i}\"/g" Vagrantfile
             vagrant destroy <<< "y\n"
