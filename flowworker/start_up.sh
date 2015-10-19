@@ -108,7 +108,7 @@ for i in ${INTERFACES}; do
     (
         instance="${INSTANCE_DIR}/${i}"
         mkdir -p "${instance}"
-        ( cd "${instance}" && vagrant destroy <<< "y\n")
+        ( cd "${instance}" && vagrant destroy -f)
         rm -rf "${instance}"
         if ! ${STOP}; then
             # create directory structure
@@ -123,7 +123,7 @@ for i in ${INTERFACES}; do
             echo ${hostname}
             sed -i "s/vm.hostname = \"flow_worker\"/vm.hostname = \"${hostname}\"/g" Vagrantfile
 
-            vagrant destroy <<< "y\n"
+            vagrant destroy -f
             vagrant up
         fi
     ) &
