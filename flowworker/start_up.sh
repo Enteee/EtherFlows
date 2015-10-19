@@ -6,6 +6,7 @@ INSTANCE_DIR="./instances"
 WORK_DIR="$(pwd)"
 STOP=false
 AUTOMATIC=false
+UNAME=$(uname -s)
 
 function usage {
     cat << EOF
@@ -66,9 +67,28 @@ if [ ! -e "${WORK_DIR}/Vagrantfile" ];then
 fi
 
 if ! ${INTERFACE_GIVEN} ; then
-    INTERFACES=$(ip link show | \
-        sed -nre 's/^[0-9]+: (.+?): .*/\1/p' | \
-        grep -v "${IGNORED_INTERFACES}")
+    if [ ${UNAME} == "Darwin" ]; then 
+        INTERFACES=$(networksetup -listallhardwareports | gawk '
+            BEGIN{
+                i = 1; FS=": "
+            }
+            /^Hardware/{
+                hw[i] = $2;
+            } 
+            /^Device/{
+                dev[i] = $2; i++
+            } 
+            END{
+                for (j = 1; j <= i; j++){ 
+                    if (match(dev[j], /^[a-z]+[0-9]+/) > 0)
+                        {printf"%s %s\n",dev[j],hw[j]}
+                }
+            }')
+    else
+        INTERFACES=$(ip link show | \
+            sed -nre 's/^[0-9]+: (.+?): .*/\1/p' | \
+            grep -v "${IGNORED_INTERFACES}")
+    fi
 fi
 echo "Interfaces:"
 echo "${INTERFACES}"
@@ -81,6 +101,9 @@ enter
         vagrant box add "${b}"
     done
 )
+if [ ${UNAME} == "Darwin" ]; then 
+    IFS=$'\n'
+fi
 for i in ${INTERFACES}; do
     (
         instance="${INSTANCE_DIR}/${i}"
@@ -93,7 +116,13 @@ for i in ${INTERFACES}; do
             find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
             find . -path "${INSTANCE_DIR}" -prune -o -type f -exec cp {} "${instance}/{}" \;
             cd "${instance}"
-            sed -i -- "s/auto_config: false/auto_config: false, bridge: \"${i}\"/g" Vagrantfile
+            sed -i "s/auto_config: false/auto_config: false, bridge: \"${i}\"/g" Vagrantfile
+
+            interface=$(tr -d " " <<< ${i})
+            hostname="$(hostname).${interface}"
+            echo ${hostname}
+            sed -i "s/vm.hostname = \"flow_worker\"/vm.hostname = \"${hostname}\"/g" Vagrantfile
+
             vagrant destroy <<< "y\n"
             vagrant up
         fi
