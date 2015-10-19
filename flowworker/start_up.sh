@@ -94,11 +94,6 @@ echo "Interfaces:"
 echo "${INTERFACES}"
 enter
 
-<<<<<<< HEAD
-if [ ${UNAME} == "Darwin" ]; then 
-    IFS=$'\n'
-fi
-=======
 # add used boxes
 (
     cd ${WORK_DIR}
@@ -106,7 +101,9 @@ fi
         vagrant box add "${b}"
     done
 )
->>>>>>> 7f0d7dd39064e120c3220da23de84853ccbe268e
+if [ ${UNAME} == "Darwin" ]; then 
+    IFS=$'\n'
+fi
 for i in ${INTERFACES}; do
     (
         instance="${INSTANCE_DIR}/${i}"
@@ -119,7 +116,13 @@ for i in ${INTERFACES}; do
             find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
             find . -path "${INSTANCE_DIR}" -prune -o -type f -exec cp {} "${instance}/{}" \;
             cd "${instance}"
-            sed -i -- "s/auto_config: false/auto_config: false, bridge: \"${i}\"/g" Vagrantfile
+            sed -i "s/auto_config: false/auto_config: false, bridge: \"${i}\"/g" Vagrantfile
+
+            interface=$(tr -d " " <<< ${i})
+            hostname="$(hostname).${interface}"
+            echo ${hostname}
+            sed -i "s/vm.hostname = \"flow_worker\"/vm.hostname = \"${hostname}\"/g" Vagrantfile
+
             vagrant destroy <<< "y\n"
             vagrant up
         fi
