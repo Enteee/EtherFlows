@@ -29,6 +29,7 @@ pacman --needed --noconfirm -S  jdk8-openjdk \
                                 ruby \
                                 python2-configargparse \
                                 ntp \
+                                htop \ 
                                 vim
 # Ruby bundler
 gem install bundler

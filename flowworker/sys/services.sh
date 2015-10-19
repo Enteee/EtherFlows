@@ -11,7 +11,7 @@ screen -S ${SCREEN_SESSION} -p "elasticsearch" -X stuff $"${ELASTIC_HOME}/bin/el
 
 screen -S ${SCREEN_SESSION} -X screen -t "logstash"
 screen -S ${SCREEN_SESSION} -p "logstash" -X stuff $"newgrp wireshark\n"
-screen -S ${SCREEN_SESSION} -p "logstash" -X stuff $"${LOGSTASH_HOME}/bin/logstash -f /vagrant/logstash.conf\n"
+screen -S ${SCREEN_SESSION} -p "logstash" -X stuff $"${LOGSTASH_HOME}/bin/logstash -f /vagrant/etc/logstash.conf\n"
 
 screen -S ${SCREEN_SESSION} -X screen -t "kibana"
 screen -S ${SCREEN_SESSION} -p "kibana" -X stuff $"${KIBANA_HOME}/bin/kibana\n"

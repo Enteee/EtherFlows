@@ -18,7 +18,7 @@
             } ],
             "_source": { "compress": true },
              "properties" : {
-                "ip.src.geoip.location" : { "type" : "geo_point", "index" : "not_analyzed" }, 
+                "ip.src.geoip.location" : { "type" : "geo_point", "index" : "not_analyzed" },
                 "ip.dst.geoip.location" : { "type" : "geo_point", "index" : "not_analyzed" }
             }
         }
