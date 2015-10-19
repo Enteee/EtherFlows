@@ -94,9 +94,19 @@ echo "Interfaces:"
 echo "${INTERFACES}"
 enter
 
+<<<<<<< HEAD
 if [ ${UNAME} == "Darwin" ]; then 
     IFS=$'\n'
 fi
+=======
+# add used boxes
+(
+    cd ${WORK_DIR}
+    for b in $(sed -nre 's/.*config\.vm\.box = "(.+?)"/\1/p' Vagrantfile); do
+        vagrant box add "${b}"
+    done
+)
+>>>>>>> 7f0d7dd39064e120c3220da23de84853ccbe268e
 for i in ${INTERFACES}; do
     (
         instance="${INSTANCE_DIR}/${i}"
