@@ -74,6 +74,13 @@ echo "Interfaces:"
 echo "${INTERFACES}"
 enter
 
+# add used boxes
+(
+    cd ${WORK_DIR}
+    for b in $(sed -nre 's/.*config\.vm\.box = "(.+?)"/\1/p' Vagrantfile); do
+        vagrant box add "${b}"
+    done
+)
 for i in ${INTERFACES}; do
     (
         instance="${INSTANCE_DIR}/${i}"
