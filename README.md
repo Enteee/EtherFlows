@@ -28,7 +28,7 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 5. Start the flow worker
 
     ```sh
-    $ ./start_up.sh -i <Sniffing NIC>
+    $ ./start_up.sh -i [Sniffing NIC]
     ```
 
 6. Open [http://localhost:5601](http://localhost:5601)

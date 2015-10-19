@@ -98,7 +98,7 @@ enter
 (
     cd ${WORK_DIR}
     for b in $(sed -nre 's/.*config\.vm\.box = "(.+?)"/\1/p' Vagrantfile); do
-        vagrant box add "${b}" &>/dev/null
+        vagrant box add "${b}" 2>/dev/null
     done
 )
 if [ ${UNAME} == "Darwin" ]; then 
