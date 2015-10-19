@@ -383,3 +383,6 @@ cluster.name: EtherFlows
 # it unless you need it is recommended (it is disabled by default).
 #
 #http.jsonp.enable: true
+
+################################## Marvel ################################
+marvel.agent.exporter.es.hosts: ["127.0.0.1:9200"]
