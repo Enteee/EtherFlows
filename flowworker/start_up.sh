@@ -70,7 +70,7 @@ for i in ${INTERFACES}; do
         mkdir -p "${instance}"
         ( cd "${instance}" && vagrant halt)
         rm -rf "${instance}"
-        if ! ${STOP}: then
+        if ! ${STOP}; then
             # create directory structure
             find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
             find . -path "${INSTANCE_DIR}" -prune -o -type f -exec cp {} "${instance}/{}" \;
