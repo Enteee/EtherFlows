@@ -19,7 +19,8 @@
             "_source": { "compress": true },
              "properties" : {
                 "ip.src.geoip" : { "type" : "geo_point", "index" : "not_analyzed" },
-                "ip.dst.geoip" : { "type" : "geo_point", "index" : "not_analyzed" }
+                "ip.dst.geoip" : { "type" : "geo_point", "index" : "not_analyzed" },
+                "dhcpv6.iaid" : { "type" : "string", "index" : "not_analyzed" }
             }
         }
     }
