@@ -4,16 +4,18 @@ INTERFACE_GIVEN=false
 IGNORED_INTERFACES="lo"
 INSTANCE_DIR="./instances"
 WORKDIR="$(pwd)"
+STOP=false
 AUTOMATIC=false
 
 function usage {
     cat << EOF
     usage: ${0} [OPTIONS]
     OPTIONS:
-        -i :    List of interface to provision VM for
-        -a :    Automatic provisioning
-        -d :    Set instance directory
-        -h :    Print this help
+        -i interface    :   Interface to provision VM for
+        -d instance dir :   Instance directory
+        -a              :   Automatic provisioning
+        -h              :   Print this help
+        -s              :   Stops all the VMs
 EOF
 }
 
@@ -25,17 +27,20 @@ function enter {
 }
 
 #Options options
-while getopts "i:d:h" opt; do
+while getopts "i:d:ash" opt; do
     case $opt in
-    a)
-        AUTOMATIC=true
-    ;;
     i)
         INTERFACES="${INTERFACES} ${OPTARG}"
         INTERFACE_GIVEN=true
     ;;
     d)
         INSTANCE_DIR="${OPTARG}"
+    ;;
+    a)
+        AUTOMATIC=true
+    ;;
+    s)
+        STOP=true
     ;;
     h)
         usage
@@ -52,32 +57,28 @@ shift $(expr $OPTIND - 1 )
 
 if ! ${INTERFACE_GIVEN} ; then
     INTERFACES=$(ip link show | \
-        sed -nre 's/[0-9]+: (.+?): .*/\1/p' | \
+        sed -nre 's/^[0-9]+: (.+?): .*/\1/p' | \
         grep -v "${IGNORED_INTERFACES}")
 fi
 echo "Interfaces:"
 echo "${INTERFACES}"
 enter
 
-echo "Removing ${INSTANCE_DIR}"
-enter
-rm -rf "${INSTANCE_DIR}"
-mkdir -p "${INSTANCE_DIR}"
-
 for i in ${INTERFACES}; do
     (
-    if [ "${i}" == "lo" ]; then
-        continue
-    fi
-    instance="${INSTANCE_DIR}/${i}"
-    # create directory structure
-    find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
-    find . -path "${INSTANCE_DIR}" -prune -o -type f -exec cp {} "${instance}/{}" \;
-    cd "${instance}"
-    sed -i -- "s/auto_config: false/auto_config: false, bridge: \"${i}\"/g" Vagrantfile
-    vagrant destroy <<< "y\n"
-    vagrant up
-    cd "${WORKDIR}"
+        instance="${INSTANCE_DIR}/${i}"
+        mkdir -p "${instance}"
+        ( cd "${instance}" && vagrant halt)
+        rm -rf "${instance}"
+        if ! ${STOP}: then
+            # create directory structure
+            find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
+            find . -path "${INSTANCE_DIR}" -prune -o -type f -exec cp {} "${instance}/{}" \;
+            cd "${instance}"
+            sed -i -- "s/auto_config: false/auto_config: false, bridge: \"${i}\"/g" Vagrantfile
+            vagrant destroy <<< "y\n"
+            vagrant up
+        fi
     ) &
 done
-wait 
+wait
