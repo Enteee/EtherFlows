@@ -98,7 +98,7 @@ enter
 (
     cd ${WORK_DIR}
     for b in $(sed -nre 's/.*config\.vm\.box = "(.+?)"/\1/p' Vagrantfile); do
-        vagrant box add "${b}"
+        vagrant box add "${b}" &>/dev/null
     done
 )
 if [ ${UNAME} == "Darwin" ]; then 
@@ -116,7 +116,7 @@ for i in ${INTERFACES}; do
             find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
             find . -path "${INSTANCE_DIR}" -prune -o -type f -exec cp {} "${instance}/{}" \;
             cd "${instance}"
-            sed -i "s/auto_config: false/auto_config: false, bridge: \"${i}\"/g" Vagrantfile
+            sed -i "s/config\.vm\.network \"public_network\"/\0, bridge: \"${i}\"/g" Vagrantfile
 
             interface=$(tr -d " " <<< ${i})
             hostname="$(hostname).${interface}"
