@@ -3,7 +3,7 @@
 INTERFACE_GIVEN=false
 IGNORED_INTERFACES="lo"
 INSTANCE_DIR="./instances"
-WORKDIR="$(pwd)"
+WORK_DIR="$(pwd)"
 STOP=false
 AUTOMATIC=false
 
@@ -13,6 +13,7 @@ function usage {
     OPTIONS:
         -i interface    :   Interface to provision VM for
         -d instance dir :   Instance directory
+        -w workdir      :   Set the workdir (must contain Vagrantfile)
         -a              :   Automatic provisioning
         -h              :   Print this help
         -s              :   Stops all the VMs
@@ -27,7 +28,7 @@ function enter {
 }
 
 #Options options
-while getopts "i:d:ash" opt; do
+while getopts "i:d:w:ash" opt; do
     case $opt in
     i)
         INTERFACES="${INTERFACES} ${OPTARG}"
@@ -35,6 +36,9 @@ while getopts "i:d:ash" opt; do
     ;;
     d)
         INSTANCE_DIR="${OPTARG}"
+    ;;
+    w)
+        WORK_DIR="${OPTARG}"
     ;;
     a)
         AUTOMATIC=true
@@ -55,6 +59,12 @@ while getopts "i:d:ash" opt; do
 done
 shift $(expr $OPTIND - 1 )
 
+if [ ! -e "${WORK_DIR}/Vagrantfile" ];then
+    echo "Invalid work dir: ${WORK_DIR}"
+    usage
+    exit 1
+fi
+
 if ! ${INTERFACE_GIVEN} ; then
     INTERFACES=$(ip link show | \
         sed -nre 's/^[0-9]+: (.+?): .*/\1/p' | \
@@ -68,12 +78,12 @@ for i in ${INTERFACES}; do
     (
         instance="${INSTANCE_DIR}/${i}"
         mkdir -p "${instance}"
-        ( cd "${instance}" && vagrant halt)
+        ( cd "${instance}" && vagrant destroy <<< "y\n")
         rm -rf "${instance}"
         if ! ${STOP}; then
             # create directory structure
-            find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
-            find . -path "${INSTANCE_DIR}" -prune -o -type f -exec cp {} "${instance}/{}" \;
+            find "${WORK_DIR}" -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
+            find "${WORK_DIR}" -path "${INSTANCE_DIR}" -prune -o -type f -exec cp {} "${instance}/{}" \;
             cd "${instance}"
             sed -i -- "s/auto_config: false/auto_config: false, bridge: \"${i}\"/g" Vagrantfile
             vagrant destroy <<< "y\n"
