@@ -28,7 +28,7 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 5. Start the flow worker
 
     ```sh
-    $ ./start_up.sh -i [Sniffing NIC]
+    $ ./start_up.sh -c [Cluster NIC]
     ```
 
 6. Open [Kibana](http://localhost:5601) or [Marvel](http://127.0.0.1:9200/_plugin/marvel/kibana/index.html)

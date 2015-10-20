@@ -39,3 +39,9 @@ gpasswd -a vagrant wireshark
 
 # Start ntp service 
 systemctl start ntpd
+
+# Disable ipv6 on sniffing interface
+sysctl -w net.ipv6.conf.enp0s9.disable_ipv6=1
+cat << EOF > /etc/sysctl.d/disable_ipv6.conf
+net.ipv6.conf.enp0s9.disable_ipv6 = 1
+EOF

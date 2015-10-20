@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
-
+CLUSTER_INTERFACE=""
+CLUSTER_INTERFACE_GIVEN=false
 INTERFACE_GIVEN=false
 IGNORED_INTERFACES="lo"
 INSTANCE_DIR="./instances"
 WORK_DIR="$(pwd)"
 STOP=false
 AUTOMATIC=false
+
 UNAME=$(uname -s)
+PUBLIC_NETWORK_IDENTIFIER='config\.vm\.network "public_network"'
 
 function usage {
     cat << EOF
-    usage: ${0} [OPTIONS]
+    usage: ${0} -c interface [OPTIONS]
     OPTIONS:
-        -i interface    :   Interface to provision VM for
+        -c interface    :   Cluster interface (mandatory, not repeated)
+        -i interface    :   Sniffing interfaces (repeated)
         -d instance dir :   Instance directory
         -w workdir      :   Set the workdir (must contain Vagrantfile)
         -a              :   Automatic provisioning
@@ -29,8 +33,12 @@ function enter {
 }
 
 #Options options
-while getopts "i:d:w:ash" opt; do
+while getopts "c:i:d:w:ash" opt; do
     case $opt in
+    c)
+        CLUSTER_INTERFACE="${OPTARG}"
+        CLUSTER_INTERFACE_GIVEN=true
+    ;;
     i)
         INTERFACES="${INTERFACES} ${OPTARG}"
         INTERFACE_GIVEN=true
@@ -59,6 +67,12 @@ while getopts "i:d:w:ash" opt; do
   esac
 done
 shift $(expr $OPTIND - 1 )
+
+if ! ${CLUSTER_INTERFACE_GIVEN}; then
+    echo "No cluster interface given"
+    usage
+    exit 1
+fi
 
 if [ ! -e "${WORK_DIR}/Vagrantfile" ];then
     echo "Invalid work dir: ${WORK_DIR}"
@@ -90,8 +104,13 @@ if ! ${INTERFACE_GIVEN} ; then
             grep -v "${IGNORED_INTERFACES}")
     fi
 fi
-echo "Interfaces:"
-echo "${INTERFACES}"
+
+cat << EOF
+Cluster interface:
+${CLUSTER_INTERFACE}
+Sniffing interfaces:
+${INTERFACES}
+EOF
 enter
 
 # add used boxes
@@ -116,14 +135,13 @@ for i in ${INTERFACES}; do
             find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
             find . -path "${INSTANCE_DIR}" -prune -o -type f -exec cp {} "${instance}/{}" \;
             cd "${instance}"
-            sed -i "s/config\.vm\.network \"public_network\"/\0, bridge: \"${i}\"/g" Vagrantfile
 
             interface=$(tr -d " " <<< ${i})
             hostname="$(hostname).${interface}"
-            echo ${hostname}
-            sed -i "s/vm.hostname = \"flowworker\"/vm.hostname = \"${hostname}\"/g" Vagrantfile
 
-            vagrant destroy -f
+            VAGRANT_CLUSTER_INTERFACE="${CLUSTER_INTERFACE}" \
+            VAGRANT_SNIFF_INTERFACE="${interface}" \
+            VAGRANT_HOSTNAME="${hostname}" \
             vagrant up
         fi
     ) &
