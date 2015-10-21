@@ -32,6 +32,12 @@ function enter {
     fi
 }
 
+
+if [ ${UNAME} == "Darwin" ]; then 
+    echo "OS X is currently not supported"
+    exit 1
+fi
+
 #Options options
 while getopts "c:i:d:w:ash" opt; do
     case $opt in
@@ -81,28 +87,9 @@ if [ ! -e "${WORK_DIR}/Vagrantfile" ];then
 fi
 
 if ! ${INTERFACE_GIVEN} ; then
-    if [ ${UNAME} == "Darwin" ]; then 
-        INTERFACES=$(networksetup -listallhardwareports | gawk '
-            BEGIN{
-                i = 1; FS=": "
-            }
-            /^Hardware/{
-                hw[i] = $2;
-            } 
-            /^Device/{
-                dev[i] = $2; i++
-            } 
-            END{
-                for (j = 1; j <= i; j++){ 
-                    if (match(dev[j], /^[a-z]+[0-9]+/) > 0)
-                        {printf"%s %s\n",dev[j],hw[j]}
-                }
-            }')
-    else
-        INTERFACES=$(ip link show | \
-            sed -nre 's/^[0-9]+: (.+?): .*/\1/p' | \
-            grep -v "${IGNORED_INTERFACES}")
-    fi
+    INTERFACES=$(ip link show | \
+        sed -nre 's/^[0-9]+: (.+?): .*/\1/p' | \
+        grep -v "${IGNORED_INTERFACES}")
 fi
 
 cat << EOF
@@ -137,7 +124,7 @@ for i in ${INTERFACES}; do
             cd "${instance}"
 
             interface=$(tr -d " " <<< ${i})
-            hostname="$(hostname).${interface}"
+            hostname="$(hostname -s).${interface}"
 
             VAGRANT_CLUSTER_INTERFACE="${CLUSTER_INTERFACE}" \
             VAGRANT_SNIFF_INTERFACE="${interface}" \
