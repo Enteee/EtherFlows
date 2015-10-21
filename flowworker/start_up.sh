@@ -107,9 +107,7 @@ enter
         vagrant box add "${b}" 2>/dev/null
     done
 )
-if [ ${UNAME} == "Darwin" ]; then 
-    IFS=$'\n'
-fi
+
 for i in ${INTERFACES}; do
     (
         instance="${INSTANCE_DIR}/${i}"
