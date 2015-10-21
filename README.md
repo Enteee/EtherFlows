@@ -31,7 +31,7 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
     $ ./start_up.sh -c [Cluster NIC]
     ```
 
-6. Open [Kibana](http://localhost:5601) or [Marvel](http://127.0.0.1:9200/_plugin/marvel/kibana/index.html)
+6. Open [Kibana @ http://localhost:5601](http://127.0.0.1:5601) or [Marvel @ http://127.0.0.1:9200/_plugin/marvel/](http://127.0.0.1:9200/_plugin/marvel/kibana/index.html)
 7. Done!
 8. Join [#EtherFlows @freenode.net][irc]
 
@@ -41,14 +41,12 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 
 ### Flow Worker
 * [python2][python2]
-* [scapy][scapy]
 
 [flowgen]:flowgen/flowgen.c
 [flowworker]:flowworker/flowworker.py
 
 [dpdk]:http://dpdk.org/
 [python2]:https://www.python.org/download/releases/2.7.3/
-[scapy]:http://www.secdev.org/projects/scapy/
 [vagrant]:https://www.vagrantup.com/downloads.html
 [virtualbox]:https://www.virtualbox.org/
 [irc]:http://webchat.freenode.net/?nick=newEtherFlowsUser&channels=EtherFlows
