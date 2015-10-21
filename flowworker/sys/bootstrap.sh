@@ -17,8 +17,9 @@ curl -sSL https://get.rvm.io | bash -s stable
 (
  wget "https://download.elasticsearch.org/elasticsearch/elasticsearch/${ELASTIC_TAR}"
  tar -xvzf "${ELASTIC_TAR}" -C "${SERVICES}"
+ cp "/vagrant/etc/elasticsearch.yml" "${ELASTIC_HOME}/config/elasticsearch.yml"
 ##
-# Download Marvel.
+# Download Marvel
 ##
  wget "https://download.elasticsearch.org/elasticsearch/marvel/${MARVEL_FILENAME}"
  ${ELASTIC_HOME}/bin/plugin -i "elasticsearch/marvel/latest" -u "file:/home/vagrant/${MARVEL_FILENAME}"

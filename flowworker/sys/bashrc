@@ -6,15 +6,18 @@ export EDITOR=vim
 
 export SERVICES=services
 
-export ELASTIC_HOME=${SERVICES}/elasticsearch*/
-export ELASTIC_TAR=elasticsearch-1.5.2.tar.gz
+export ELASTIC_VERSION="1.5.2"
+export ELASTIC_HOME="${SERVICES}/elasticsearch-${ELASTIC_VERSION}/"
+export ELASTIC_TAR="elasticsearch-${ELASTIC_VERSION}.tar.gz"
 export MARVEL_FILENAME="marvel-latest.zip"
 
-export LOGSTASH_HOME=${SERVICES}/logstash*/
-export LOGSTASH_TAR=logstash-1.5.4.tar.gz
+export LOGSTASH_VERSION="1.5.4"
+export LOGSTASH_HOME="${SERVICES}/logstash-${LOGSTASH_VERSION}/"
+export LOGSTASH_TAR="logstash-${LOGSTASH_VERSION}.tar.gz"
 
-export KIBANA_HOME=${SERVICES}/kibana*/
-export KIBANA_TAR=kibana-4.1.2-linux-x64.tar.gz
+export KIBANA_VERSION="4.1.2"
+export KIBANA_HOME="${SERVICES}/kibana-${KIBANA_VERSION}-linux-x64/"
+export KIBANA_TAR="kibana-${KIBANA_VERSION}-linux-x64.tar.gz"
 
 export SCREEN_SESSION=$(screen -ls | sed -nre 's/\s*([0-9]+\.worksession).*/\1/p')
 

@@ -1,5 +1,6 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
+require 'pp'
 VAGRANTFILE_API_VERSION = "2"
 
 Vagrant.configure(2) do |config|
@@ -10,13 +11,18 @@ Vagrant.configure(2) do |config|
         v.memory = 4096
         v.cpus = 4
     end
+
     config.vm.network "forwarded_port", guest: 9200, host: 9200, auto_correct: true # Elasticsearch
     config.vm.network "forwarded_port", guest: 5601, host: 5601, auto_correct: true # Kibana
-    config.vm.network "public_network", auto_config: false
+
+    config.vm.network "public_network", bridge: ENV['VAGRANT_CLUSTER_INTERFACE']
+    config.vm.network "public_network", auto_config: false, bridge: ENV['VAGRANT_SNIFF_INTERFACE']
     config.vm.provider "virtualbox" do |v|
-      v.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]
+        v.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]
+        v.customize ["modifyvm", :id, "--nicpromisc3", "allow-all"]
     end
 
+    config.vm.hostname = ENV['VAGRANT_HOSTNAME']
     # Environment
     config.vm.provision "file", source: "sys/bashrc", destination: ".bashrc"
 
@@ -35,5 +41,4 @@ Vagrant.configure(2) do |config|
         sh.path = "sys/services.sh"
         sh.privileged = false
     end
-
 end
