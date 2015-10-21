@@ -45,3 +45,6 @@ sysctl -w net.ipv6.conf.enp0s9.disable_ipv6=1
 cat << EOF > /etc/sysctl.d/disable_ipv6.conf
 net.ipv6.conf.enp0s9.disable_ipv6 = 1
 EOF
+
+# Set RAW_capabilities for python, so thwt we can send packets back
+setcap 'CAP_NET_RAW+eip' /usr/bin/python2.7
