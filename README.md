@@ -31,7 +31,7 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
     $ ./start_up.sh -c [Cluster NIC]
     ```
 
-6. Open [Kibana @ http://localhost:5601](http://127.0.0.1:5601) or [Marvel @ http://127.0.0.1:9200/_plugin/marvel/](http://127.0.0.1:9200/_plugin/marvel/kibana/index.html)
+6. Open [Kibana @ http://127.0.0.1:5601](http://127.0.0.1:5601) or [Marvel @ http://127.0.0.1:9200/_plugin/marvel/](http://127.0.0.1:9200/_plugin/marvel/kibana/index.html)
 7. Done!
 8. Join [#EtherFlows @freenode.net][irc]
 
