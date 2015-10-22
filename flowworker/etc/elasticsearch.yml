@@ -4,6 +4,9 @@ cluster.name: EtherFlows
 network.bind_host: [ "_enp0s8:ipv4_", "_local_" ]
 network.publish_host: _enp0s8:ipv4_
 
+# Disable autodiscovery
+#discovery.zen.ping.multicast.enabled : false
+
 ################################## Marvel ################################
 marvel.agent.exporter.es.hosts: ["127.0.0.1:9200"]
 
