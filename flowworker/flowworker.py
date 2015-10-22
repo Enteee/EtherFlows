@@ -17,7 +17,7 @@ parser.add_argument('-m',
                     default=FLOWGEN_MAC,
                     type=str,
                     dest='mac',
-                    help='MAC address of flows generated; Set to "all" if you want to capture all MACs [default: {}]'.format(FLOWGEN_MAC)
+                    help='Source MAC address of flows generated; Set to "all" if you want to capture all MACs [default: {}]'.format(FLOWGEN_MAC)
                     )
 parser.add_argument('-i',
                     required=True,
@@ -37,8 +37,7 @@ parser.add_argument('-l',
                     help='Maximum lenght of data in tshark pdml-field [default: {}]'.format(DATA_MAXLEN)
                     )
 
-
-class PdmlHandler( xml.sax.ContentHandler ):
+class PdmlHandler(xml.sax.ContentHandler):
     def __init__(self):
         pass
 
@@ -46,10 +45,9 @@ class PdmlHandler( xml.sax.ContentHandler ):
         src_hex = src.replace(':','').decode('hex')
         dst_hex = dst.replace(':','').decode('hex')
 
-        payload = ('['*30)+'ENTE'+(']'*30)
-        checksum = '\x98\x08\xE8\x92'
-        ethertype = '\x08\x01'
-
+        payload = 'ENTE'
+        checksum = '\x63\x07\x3d\x02'
+        ethertype = '\x09\x00'
         s.send(dst_hex+src_hex+ethertype+payload+checksum)
 
     def boolify(self, s):
@@ -75,29 +73,31 @@ class PdmlHandler( xml.sax.ContentHandler ):
         else:
             if attributes.has_key('name'):
                 name = attributes.getValue('name')
-                #check if flow is in dictionary
-                if not args.no_answer and name == 'eth.src':
-                    src = attributes.getValue('show')
-                    dst = str(pkt['eth.dst'])
-                    if dst not in flows:
-                        self.send_ack(dst, src)
-                        flows[dst] = True
-            # Extract raw data
-            if attributes.has_key('show'):
-                show = attributes.getValue('show')
-                if len(show) > args.data_maxlen:
-                    show = DATA_TOO_LONG
-                pkt[name] = self.autoconvert(show)
-            # Extract showname
-            if attributes.has_key('showname'):
-                showname = attributes.getValue('showname')
-                if len(showname) > args.data_maxlen:
-                    showname = DATA_TOO_LONG
-                pkt['{}.show'.format(name)] = showname
+                # Extract raw data
+                if attributes.has_key('show'):
+                    show = attributes.getValue('show')
+                    if len(show) > args.data_maxlen:
+                        show = DATA_TOO_LONG
+                    pkt[name] = self.autoconvert(show)
+                # Extract showname
+                if attributes.has_key('showname'):
+                    showname = attributes.getValue('showname')
+                    if len(showname) > args.data_maxlen:
+                        showname = DATA_TOO_LONG
+                    pkt['{}.show'.format(name)] = showname
 
     # Call when an elements ends
     def endElement(self, tag):
         if tag == 'packet':
+            if not args.no_answer:
+                try:
+                    dst = pkt['eth.dst']
+                    src = pkt['eth.src']
+                    if dst not in flows:
+                        self.send_ack(dst, src)
+                        flows[dst] = True
+                except KeyError:
+                    pass
             json.dump(pkt,sys.stdout)
             sys.stdout.write('\n')
             sys.stdout.flush()
@@ -113,20 +113,20 @@ if ( __name__ == '__main__'):
         try:
             s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
         except socket.error , msg:
-            print 'Socket could not be created. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+            print('Socket could not be created. Error Code : {} Message: {}'.format(str(msg[0]),msg[1]))
             sys.exit()
         try:
             s.bind((args.interface, 0))
         except:
-            print 'Could not bind socket'
+            print('Could not bind socket')
             sys.exit()
-    #pkt dictionary 
-    pkt = {}   
+    #pkt dictionary
+    pkt = {}
     # create an XMLReader
     parser = xml.sax.make_parser()
     # turn off namepsaces
     parser.setFeature(xml.sax.handler.feature_namespaces, 0)
     # override the default ContextHandler
-    Handler = PdmlHandler()
-    parser.setContentHandler( Handler )
+    handler = PdmlHandler()
+    parser.setContentHandler(handler)
     parser.parse(sys.stdin)
