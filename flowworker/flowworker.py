@@ -7,18 +7,11 @@ import xml.sax
 import socket
 
 #MAC Addr of the flow generator 
-FLOWGEN_MAC = 'b4:be:b1:6b:00:b5'
 DATA_MAXLEN = 200
 DATA_TOO_LONG = 'Data too long'
 
 parser = argparse.ArgumentParser(description='Flowworker')
 
-parser.add_argument('-m',
-                    default=FLOWGEN_MAC,
-                    type=str,
-                    dest='mac',
-                    help='Source MAC address of flows generated; Set to "all" if you want to capture all MACs [default: {}]'.format(FLOWGEN_MAC)
-                    )
 parser.add_argument('-i',
                     required=True,
                     type=str,

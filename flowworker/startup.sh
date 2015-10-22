@@ -100,35 +100,24 @@ ${INTERFACES}
 EOF
 enter
 
-# add used boxes
-(
-    cd ${WORK_DIR}
-    for b in $(sed -nre 's/.*config\.vm\.box = "(.+?)"/\1/p' Vagrantfile); do
-        vagrant box add "${b}" 2>/dev/null
-    done
-)
-
 for i in ${INTERFACES}; do
-    (
-        instance="${INSTANCE_DIR}/${i}"
-        mkdir -p "${instance}"
-        ( cd "${instance}" && vagrant destroy -f)
-        rm -rf "${instance}"
-        if ! ${STOP}; then
-            # create directory structure
-            cd "${WORK_DIR}"
-            find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
-            find . -path "${INSTANCE_DIR}" -prune -o -type f -exec ln "${WORK_DIR}/{}" "${instance}/{}" \;
-            cd "${instance}"
+    instance="${INSTANCE_DIR}/${i}"
+    interface=$(tr -d " " <<< ${i})
+    hostname="$(hostname -s).${interface}"
 
-            interface=$(tr -d " " <<< ${i})
-            hostname="$(hostname -s).${interface}"
+    export VAGRANT_CLUSTER_INTERFACE="${CLUSTER_INTERFACE}"
+    export VAGRANT_SNIFF_INTERFACE="${interface}"
+    export VAGRANT_HOSTNAME="${hostname}"
 
-            VAGRANT_CLUSTER_INTERFACE="${CLUSTER_INTERFACE}" \
-            VAGRANT_SNIFF_INTERFACE="${interface}" \
-            VAGRANT_HOSTNAME="${hostname}" \
-            vagrant up
-        fi
-    ) &
+    mkdir -p "${instance}"
+    ( cd "${instance}" && vagrant destroy -f)
+    rm -rf "${instance}"
+    if ! ${STOP}; then
+        # create directory structure
+        cd "${WORK_DIR}"
+        find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
+        find . -path "${INSTANCE_DIR}" -prune -o -type f -exec ln "${WORK_DIR}/{}" "${instance}/{}" \;
+        cd "${instance}"
+        vagrant up
+    fi
 done
-wait
