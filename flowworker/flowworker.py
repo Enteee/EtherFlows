@@ -7,7 +7,9 @@ import xml.sax
 import socket
 
 #MAC Addr of the flow generator 
-FLOWGEN_MAC = "b4:be:b1:6b:00:b5"
+FLOWGEN_MAC = 'b4:be:b1:6b:00:b5'
+DATA_MAXLEN = 200
+DATA_TOO_LONG = 'Data too long'
 
 parser = argparse.ArgumentParser(description='Flowworker')
 
@@ -28,6 +30,12 @@ parser.add_argument('-no',
                     action="store_true",
                     help='Dont answer packets'
                     )
+parser.add_argument('-l',
+                    default=DATA_MAXLEN,
+                    type=int,
+                    dest='data_maxlen',
+                    help='Maximum lenght of data in tshark pdml-field [default: {}]'.format(DATA_MAXLEN)
+                    )
 
 
 class PdmlHandler( xml.sax.ContentHandler ):
@@ -38,10 +46,10 @@ class PdmlHandler( xml.sax.ContentHandler ):
         src_hex = src.replace(':','').decode('hex')
         dst_hex = dst.replace(':','').decode('hex')
 
-        payload = ("["*30)+"ENTE"+("]"*30)
-        checksum = "\x98\x08\xE8\x92"
-        ethertype = "\x08\x01"
-    
+        payload = ('['*30)+'ENTE'+(']'*30)
+        checksum = '\x98\x08\xE8\x92'
+        ethertype = '\x08\x01'
+
         s.send(dst_hex+src_hex+ethertype+payload+checksum)
 
     def boolify(self, s):
@@ -49,7 +57,7 @@ class PdmlHandler( xml.sax.ContentHandler ):
             return True
         if s == 'False':
             return False
-        raise ValueError("Not a bool")
+        raise ValueError('Not a bool')
 
     # Try to convert variables into datatypes
     def autoconvert(self, s):
@@ -62,37 +70,43 @@ class PdmlHandler( xml.sax.ContentHandler ):
 
     # Call when an element starts
     def startElement(self, tag, attributes):
-        if tag == "packet":
+        if tag == 'packet':
             pkt.clear()
         else:
-            if attributes.has_key("name"):
-                name = attributes.getValue("name")
-                #check if flow is dictionary
-                if not args.no_answer and name == "eth.src":
-                    src = attributes.getValue("show")
-                    dst = str(pkt["eth.dst"])
+            if attributes.has_key('name'):
+                name = attributes.getValue('name')
+                #check if flow is in dictionary
+                if not args.no_answer and name == 'eth.src':
+                    src = attributes.getValue('show')
+                    dst = str(pkt['eth.dst'])
                     if dst not in flows:
                         self.send_ack(dst, src)
                         flows[dst] = True
-
-            if attributes.has_key("show"):
-                pkt[name] = self.autoconvert(attributes.getValue("show"))
-            if attributes.has_key("showname"):
-                pkt['{}.show'.format(name)] = attributes.getValue("showname")
-                       
+            # Extract raw data
+            if attributes.has_key('show'):
+                show = attributes.getValue('show')
+                if len(show) > args.data_maxlen:
+                    show = DATA_TOO_LONG
+                pkt[name] = self.autoconvert(show)
+            # Extract showname
+            if attributes.has_key('showname'):
+                showname = attributes.getValue('showname')
+                if len(showname) > args.data_maxlen:
+                    showname = DATA_TOO_LONG
+                pkt['{}.show'.format(name)] = showname
 
     # Call when an elements ends
     def endElement(self, tag):
-        if tag == "packet":
+        if tag == 'packet':
             json.dump(pkt,sys.stdout)
-            sys.stdout.write("\n")
+            sys.stdout.write('\n')
             sys.stdout.flush()
 
     # Call when a character is read
     def characters(self, content):
         pass
 
-if ( __name__ == "__main__"):
+if ( __name__ == '__main__'):
     args = parser.parse_args()
     if not args.no_answer:
         flows = {}

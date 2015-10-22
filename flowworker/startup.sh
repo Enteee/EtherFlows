@@ -118,7 +118,7 @@ for i in ${INTERFACES}; do
             # create directory structure
             cd "${WORK_DIR}"
             find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
-            find . -path "${INSTANCE_DIR}" -prune -o -type f -exec cp {} "${instance}/{}" \;
+            find . -path "${INSTANCE_DIR}" -prune -o -type f -exec ln -s {} "${instance}/{}" \;
             cd "${instance}"
 
             interface=$(tr -d " " <<< ${i})
