@@ -1,6 +1,6 @@
 {
     "template": "logstash-*",
-	"order": 1,
+    "order": 1,
     "settings" : {
         "number_of_shards" : 10,
         "number_of_replicas" : 1
@@ -20,24 +20,24 @@
             "_source": { "compress": true },
              "properties" : {
                 "ip.src.geoip" : {
-					"type" : "object",
-				   	"dynamic": true,
-				   	"properties" : {
-					 	"ip": { "type": "ip"},
-					 	"location" : { "type" : "geo_point"},
-					 	"latitude" : { "type" : "float"},
-					 	"longitude" : { "type" : "float"}
-				   	}
+                    "type" : "object",
+                    "dynamic": true,
+                    "properties" : {
+                        "ip": { "type": "ip"},
+                        "location" : { "type" : "geo_point"},
+                        "latitude" : { "type" : "float"},
+                        "longitude" : { "type" : "float"}
+                    }
                 },
-				"ip.dst.geoip" : {
-					"type" : "object",
-				   	"dynamic": true,
-				   	"properties" : {
-					 	"ip": { "type": "ip"},
-					 	"location" : { "type" : "geo_point"},
-					 	"latitude" : { "type" : "float"},
-					 	"longitude" : { "type" : "float"}
-				   	}
+                "ip.dst.geoip" : {
+                    "type" : "object",
+                    "dynamic": true,
+                    "properties" : {
+                        "ip": { "type": "ip"},
+                        "location" : { "type" : "geo_point"},
+                        "latitude" : { "type" : "float"},
+                        "longitude" : { "type" : "float"}
+                    }
                 },
                 "dhcpv6.iaid" : { "type" : "string", "index" : "not_analyzed" }
             }
