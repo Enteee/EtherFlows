@@ -11,6 +11,9 @@ export ELASTIC_HOME="${SERVICES}/elasticsearch-${ELASTIC_VERSION}/"
 export ELASTIC_TAR="elasticsearch-${ELASTIC_VERSION}.tar.gz"
 export MARVEL_FILENAME="marvel-latest.zip"
 
+# Environment setup
+export ES_HEAP_SIZE=5000
+
 export LOGSTASH_VERSION="1.5.4"
 export LOGSTASH_HOME="${SERVICES}/logstash-${LOGSTASH_VERSION}/"
 export LOGSTASH_TAR="logstash-${LOGSTASH_VERSION}.tar.gz"
