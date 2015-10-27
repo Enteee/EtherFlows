@@ -29,6 +29,31 @@ parser.add_argument('-l',
                     dest='data_maxlen',
                     help='Maximum lenght of data in tshark pdml-field [default: {}]'.format(DATA_MAXLEN)
                     )
+class Flow():
+    def __init__(self, flowid):
+        self.__flowid = flowid
+        self.__pkts = []
+        self.__flused = False
+
+    def add_pkt(self, pkt)
+        pkt['env.flowid'] = self.flowid
+        if self.__flushed:
+            self._write(pkt)
+        else:
+            # Buffer packet
+            self.__pkts.append(pkt)
+
+    def flush(self)
+        for p in self.__pkts:
+            self.write(p)
+        self.__flused = True
+
+    def _write(self, pkt):
+        json.dump(p,sys.stdout)
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+
+            
 
 class PdmlHandler(xml.sax.ContentHandler):
     def __init__(self):
@@ -84,16 +109,16 @@ class PdmlHandler(xml.sax.ContentHandler):
         if tag == 'packet':
             if not args.no_answer:
                 try:
-                    dst = pkt['eth.dst']
-                    src = pkt['eth.src']
-                    if dst not in flows:
-                        self.send_ack(dst, src)
-                        flows[dst] = True
+                    flowid = pkt['eth.dst']
+                    try: 
+                        flow = flows[flowid]
+                    except KeyError:
+                        flows[flowid] = Flow(flowid)
+                        flow = flows[flowid]
+                    flow.add_pkt(pkt)
                 except KeyError:
                     pass
-            json.dump(pkt,sys.stdout)
-            sys.stdout.write('\n')
-            sys.stdout.flush()
+
 
     # Call when a character is read
     def characters(self, content):

@@ -39,7 +39,8 @@
                         "longitude" : { "type" : "float"}
                     }
                 },
-                "dhcpv6.iaid" : { "type" : "string", "index" : "not_analyzed" }
+                "dhcpv6.iaid" : { "type" : "string", "index" : "not_analyzed" },
+                "bootp.option.value" : { "type" : "string", "index" : "not_analyzed" }
             }
         }
     }
