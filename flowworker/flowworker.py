@@ -38,6 +38,10 @@ parser.add_argument('-t',
                     help='Lenght (in seconds) to buffer a flow before writing the packets [default: {}]'.format(FLOW_BUFFER_TIME)
                     )
 class Flow():
+
+    """ The overall packet time """
+    newest_overall_frame_time = 0
+
     def __init__(self, first_frame):
         self.__flowid = first_frame['eth.dst']
         self.__flowgen = first_frame['eth.src']
@@ -51,6 +55,7 @@ class Flow():
         # check if packet expands flow length
         self.__first_frame_time = min(self.__first_frame_time, frame['frame.time_epoch'])
         self.__newest_frame_time = max(self.__newest_frame_time, frame['frame.time_epoch'])
+        Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, frame['frame.time_epoch'])
         if self.__flushed:
             self._write_frame(frame)
         else:
@@ -60,8 +65,8 @@ class Flow():
             if flow_length > args.flow_buffer_time:
                 self.flush()
 
-    def expired(self):
-        return not (self._flushed and self.__newest_frame_time < time.time() + args.flow_buffer_time)
+    def not_expired(self):
+        return self.__newest_frame_time > Flow.newest_overall_frame_time - args.flow_buffer_time
 
     def flush(self):
         for p in self.__frames:
@@ -83,9 +88,9 @@ class Flow():
         sys.stdout.flush()
 
 class PdmlHandler(xml.sax.ContentHandler):
-
     def __init__(self):
         self.__frame = {}
+        self.__flows = {}
 
     def boolify(self, s):
         if s == 'True':
@@ -106,7 +111,7 @@ class PdmlHandler(xml.sax.ContentHandler):
     # Call when an element starts
     def startElement(self, tag, attributes):
         if tag == 'packet':
-            self.__frame.clear()
+            self.__frame = {}
         else:
             if attributes.has_key('name'):
                 name = attributes.getValue('name')
@@ -125,17 +130,19 @@ class PdmlHandler(xml.sax.ContentHandler):
 
     # Call when an elements ends
     def endElement(self, tag):
+        # clean up expired flows
+        self.__flows = { flowid: flow for (flowid, flow) in self.__flows.items() if flow.not_expired() }
         if tag == 'packet':
-                try:
-                    flowid = self.__frame['eth.dst']
-                    try: 
-                        flows[flowid].add_frame(self.__frame)
-                    except KeyError:
-                        # flow unknown add new flow
-                        flows[flowid] = Flow(self.__frame)
-                        flow = flows[flowid]
+            try:
+                flowid = self.__frame['eth.dst']
+                try: 
+                    flow = self.__flows[flowid]
+                    self.__flows[flowid].add_frame(self.__frame)
                 except KeyError:
-                    pass
+                    # flow unknown add new flow
+                    self.__flows[flowid] = Flow(self.__frame)
+            except KeyError:
+                pass
 
     # Call when a character is read
     def characters(self, content):
@@ -143,7 +150,6 @@ class PdmlHandler(xml.sax.ContentHandler):
 
 if ( __name__ == '__main__'):
     args = parser.parse_args()
-    flows = {}
     # bind socket
     if not args.no_ack:
         socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
@@ -156,7 +162,3 @@ if ( __name__ == '__main__'):
     handler = PdmlHandler()
     parser.setContentHandler(handler)
     parser.parse(sys.stdin)
-    # flush all buffered flows
-    for f in flows:
-        
-    
