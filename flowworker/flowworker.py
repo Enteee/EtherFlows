@@ -87,6 +87,7 @@ class Flow():
         json.dump(frame, sys.stdout)
         sys.stdout.write('\n')
         sys.stdout.flush()
+        self.__send_ack()
 
 class PdmlHandler(xml.sax.ContentHandler):
     def __init__(self):
