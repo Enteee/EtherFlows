@@ -71,6 +71,7 @@ class Flow():
     def flush(self):
         for p in self.__frames:
             self._write_frame(p)
+        self.__frames = []
         self.__flused = True
 
     def __send_ack(self):
