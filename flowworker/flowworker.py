@@ -44,7 +44,7 @@ class Flow():
 
     def __init__(self, first_frame):
         self.__flowid = first_frame['eth.dst']
-        self.__flowgen = first_frame['eth.src']
+        self.__flowgen = "0x{3}{4}{5}".format(*first_frame['eth.src'].split(':'))
         self.__frames = [first_frame]
         self.__flushed = False
         self.__newest_frame_time = self.__first_frame_time = first_frame['frame.time_epoch']
@@ -52,6 +52,7 @@ class Flow():
 
     def add_frame(self, frame):
         frame['env.flowid'] = self.__flowid
+        frame['env.flowgen'] = self.__flowgen
         # check if packet expands flow length
         self.__first_frame_time = min(self.__first_frame_time, frame['frame.time_epoch'])
         self.__newest_frame_time = max(self.__newest_frame_time, frame['frame.time_epoch'])
