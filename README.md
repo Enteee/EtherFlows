@@ -25,6 +25,10 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
     ```
 
 4. Navigate to the flow worker directory
+
+    ```sh
+    $ cd flowworker/
+    ```
 5. Start the flow worker
 
     ```sh
