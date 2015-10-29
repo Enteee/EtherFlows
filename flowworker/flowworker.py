@@ -1,4 +1,4 @@
-#! /usr/bin/env python2
+#!/usr/bin/env python2
 # vim: set fenc=utf8 ts=4 sw=4 et :
 import time 
 import sys
@@ -6,11 +6,13 @@ import json
 import argparse
 import xml.sax
 import socket
+import os
 
 #MAC Addr of the flow generator 
 DATA_MAXLEN = 200
 DATA_TOO_LONG = 'Data too long'
 FLOW_BUFFER_TIME = 3
+STANDALONE_FILE = '/vagrant/sys/standalone'
 
 parser = argparse.ArgumentParser(description='Flowworker')
 
@@ -20,10 +22,11 @@ parser.add_argument('-i',
                     dest='interface',
                     help='Interface to listen on'
                     )
-parser.add_argument('-no',
-                    dest='no_ack',
+parser.add_argument('-S',
+                    default=os.path.isfile(STANDALONE_FILE),
+                    dest='standalone',
                     action="store_true",
-                    help='Dont answer packets'
+                    help='Enable standalone mode'
                     )
 parser.add_argument('-l',
                     default=DATA_MAXLEN,
@@ -54,7 +57,8 @@ class Flow():
 
     def add_frame(self, frame):
         frame['env.flowid'] = self.__flowid_mac
-        frame['env.flowgen'] = self.__flowgen
+        if not args.standalone:
+            frame['env.flowgen'] = self.__flowgen
         # check if packet expands flow length
         self.__first_frame_time = min(self.__first_frame_time, frame['frame.time_epoch'])
         self.__newest_frame_time = max(self.__newest_frame_time, frame['frame.time_epoch'])
@@ -78,7 +82,7 @@ class Flow():
         self.__flused = True
 
     def __send_ack(self):
-        if not args.no_ack:
+        if not args.standalone:
             ack_frame = self.__flowgen_mac.replace(':','').decode('hex') # dst MAC
             ack_frame += self.__flowid_mac.replace(':','').decode('hex') # src MAC
             ack_frame += '\x09\x00' # ethertype 
@@ -156,7 +160,7 @@ class PdmlHandler(xml.sax.ContentHandler):
 if ( __name__ == '__main__'):
     args = parser.parse_args()
     # bind socket
-    if not args.no_ack:
+    if not args.standalone:
         socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
         socket.bind((args.interface, 0))
     # create an XMLReader

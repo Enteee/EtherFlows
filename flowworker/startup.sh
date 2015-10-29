@@ -8,6 +8,7 @@ WORK_DIR="$(pwd)"
 STOP=false
 AUTOMATIC=false
 STANDALONE=false
+STANDALONE_FILE="sys/standalone"
 
 UNAME=$(uname -s)
 PUBLIC_NETWORK_IDENTIFIER='config\.vm\.network "public_network"'
@@ -124,7 +125,7 @@ for i in ${INTERFACES}; do
         find . -path "${INSTANCE_DIR}" -prune -o -type f -exec ln "${WORK_DIR}/{}" "${instance}/{}" \;
         cd "${instance}"
         if ${STANDALONE}; then
-            touch "sys/standalone.tmp"
+            touch "${STANDALONE_FILE}"
         fi
         vagrant up
     fi

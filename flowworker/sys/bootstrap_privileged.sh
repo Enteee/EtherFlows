@@ -2,8 +2,9 @@
 
 cp  /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
 cat << 'EOF' > /etc/pacman.d/mirrorlist
+## Switzerland
+Server = http://archlinux.puzzle.ch/$repo/os/$arch
 ## Germany
-Server = http://mirror.23media.de/archlinux/$repo/os/$arch
 Server = http://archlinux.limun.org/$repo/os/$arch
 Server = https://archlinux.limun.org/$repo/os/$arch
 Server = http://artfiles.org/archlinux.org/$repo/os/$arch
