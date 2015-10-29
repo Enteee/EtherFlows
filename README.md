@@ -36,6 +36,11 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 8. Join [#EtherFlows @freenode.net][irc]
 
 ## Requirments
+### Analysis network
+* Configure the same [MAC address aging time][mac aging] on all the switches, the minimum [MAC address aging time][mac aging] will be your flow timeout.
+* Only a hierarchical switching topology will work (no loops allowed)
+* Disable STP / RSTP or similar protocols on all switches
+
 ### Flow Gen
 * [dpdk >= 2.1.0][dpdk]
 
@@ -50,3 +55,4 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 [vagrant]:https://www.vagrantup.com/downloads.html
 [virtualbox]:https://www.virtualbox.org/
 [irc]:http://webchat.freenode.net/?nick=newEtherFlowsUser&channels=EtherFlows
+[mac aging]:https://www.juniper.net/documentation/en_US/junos13.2/topics/concept/bridging-mac-aging.html
