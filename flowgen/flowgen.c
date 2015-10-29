@@ -32,7 +32,11 @@
  */
 
 #include <stdint.h>
+#include <time.h>
+#include <stdlib.h>
+#include <stdint.h>
 #include <inttypes.h>
+
 #include <rte_eal.h>
 #include <rte_ethdev.h>
 #include <rte_cycles.h>
@@ -58,6 +62,8 @@ static const struct rte_eth_conf port_conf_default = {
 		}
 	},
 };
+
+static uint32_t flowgen_id;
 
 /* basicfwd.c: Basic DPDK skeleton forwarding example. */
 
@@ -167,13 +173,18 @@ lcore_main(void)
 			ether_header->d_addr.addr_bytes[3] = ((uint8_t*)&bufs[i]->hash.rss)[1];
 			ether_header->d_addr.addr_bytes[4] = ((uint8_t*)&bufs[i]->hash.rss)[2];
 			ether_header->d_addr.addr_bytes[5] = ((uint8_t*)&bufs[i]->hash.rss)[3];
-			/** Set source adress */
-			ether_header->s_addr.addr_bytes[0] = 0xB4;
-			ether_header->s_addr.addr_bytes[1] = 0xBE;
-			ether_header->s_addr.addr_bytes[2] = 0xB1;
-			ether_header->s_addr.addr_bytes[3] = 0x6B;
-			ether_header->s_addr.addr_bytes[4] = 0x00;
-			ether_header->s_addr.addr_bytes[5] = 0xB5;
+			/** 
+            * Set source adress 
+            * 3 bytes: flow gen identifier
+            * 3 bytes: flow gen instance
+            */
+			ether_header->s_addr.addr_bytes[0] = 0xBA;
+			ether_header->s_addr.addr_bytes[1] = 0xDA;
+			ether_header->s_addr.addr_bytes[2] = 0x55;
+
+			ether_header->s_addr.addr_bytes[3] = (uint8_t)( (flowgen_id >> 16) & 0xff);
+			ether_header->s_addr.addr_bytes[4] = (uint8_t)( (flowgen_id >> 8) & 0xff);
+			ether_header->s_addr.addr_bytes[5] = (uint8_t)(flowgen_id & 0xff);
 		}
 
 		/* Send burst of TX packets, to second port of pair. */
@@ -199,6 +210,10 @@ main(int argc, char *argv[])
 	struct rte_mempool *mbuf_pool;
 	unsigned nb_ports;
 	uint8_t portid;
+
+    /* Generate random flowgen id */
+    srand(time(NULL));
+    flowgen_id = (uint32_t)rand();
 
 	/* Initialize the Environment Abstraction Layer (EAL). */
 	int ret = rte_eal_init(argc, argv);
