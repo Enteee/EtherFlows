@@ -43,15 +43,17 @@ class Flow():
     newest_overall_frame_time = 0
 
     def __init__(self, first_frame):
-        self.__flowid = first_frame['eth.dst']
-        self.__flowgen = "0x{3}{4}{5}".format(*first_frame['eth.src'].split(':'))
-        self.__frames = [first_frame]
+        self.__frames = []
+        self.__flowid_mac = first_frame['eth.dst']
+        self.__flowgen_mac = first_frame['eth.src']
+        self.__flowgen = "0x{3}{4}{5}".format(*self.__flowgen_mac.split(':'))
         self.__flushed = False
         self.__newest_frame_time = self.__first_frame_time = first_frame['frame.time_epoch']
+        self.add_frame(first_frame)
         self.__send_ack()
 
     def add_frame(self, frame):
-        frame['env.flowid'] = self.__flowid
+        frame['env.flowid'] = self.__flowid_mac
         frame['env.flowgen'] = self.__flowgen
         # check if packet expands flow length
         self.__first_frame_time = min(self.__first_frame_time, frame['frame.time_epoch'])
@@ -77,8 +79,8 @@ class Flow():
 
     def __send_ack(self):
         if not args.no_ack:
-            ack_frame = self.__flowgen.replace(':','').decode('hex') # dst MAC
-            ack_frame += self.__flowid.replace(':','').decode('hex') # src MAC
+            ack_frame = self.__flowgen_mac.replace(':','').decode('hex') # dst MAC
+            ack_frame += self.__flowid_mac.replace(':','').decode('hex') # src MAC
             ack_frame += '\x09\x00' # ethertype 
             ack_frame += 'ENTE' # payload
             ack_frame += '\x63\x07\x3d\x02' # checksum
