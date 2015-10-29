@@ -7,6 +7,7 @@ INSTANCE_DIR="./instances"
 WORK_DIR="$(pwd)"
 STOP=false
 AUTOMATIC=false
+STANDALONE=false
 
 UNAME=$(uname -s)
 PUBLIC_NETWORK_IDENTIFIER='config\.vm\.network "public_network"'
@@ -22,6 +23,7 @@ function usage {
         -a              :   Automatic provisioning
         -h              :   Print this help
         -s              :   Stops all the VMs
+        -S              :   Start all the VMs in standalone mode
 EOF
 }
 
@@ -39,7 +41,7 @@ if [ ${UNAME} == "Darwin" ]; then
 fi
 
 #Options options
-while getopts "c:i:d:w:ash" opt; do
+while getopts "c:i:d:w:asSh" opt; do
     case $opt in
     c)
         CLUSTER_INTERFACE="${OPTARG}"
@@ -64,6 +66,9 @@ while getopts "c:i:d:w:ash" opt; do
     h)
         usage
         exit 0;
+    ;;
+    S)
+        STANDALONE=true
     ;;
     \?)
         echo "Invalid option: -${OPTARG}"
@@ -118,6 +123,9 @@ for i in ${INTERFACES}; do
         find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
         find . -path "${INSTANCE_DIR}" -prune -o -type f -exec ln "${WORK_DIR}/{}" "${instance}/{}" \;
         cd "${instance}"
+        if ${STANDALONE}; then
+            touch "sys/standalone.tmp"
+        fi
         vagrant up
     fi
 done

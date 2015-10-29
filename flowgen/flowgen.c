@@ -174,10 +174,10 @@ lcore_main(void)
 			ether_header->d_addr.addr_bytes[4] = ((uint8_t*)&bufs[i]->hash.rss)[2];
 			ether_header->d_addr.addr_bytes[5] = ((uint8_t*)&bufs[i]->hash.rss)[3];
 			/** 
-            * Set source adress 
-            * 3 bytes: flow gen identifier
-            * 3 bytes: flow gen instance
-            */
+			* Set source adress 
+			* 3 bytes: flow gen identifier
+			* 3 bytes: flow gen instance
+			*/
 			ether_header->s_addr.addr_bytes[0] = 0xBA;
 			ether_header->s_addr.addr_bytes[1] = 0xDA;
 			ether_header->s_addr.addr_bytes[2] = 0x55;
@@ -211,9 +211,9 @@ main(int argc, char *argv[])
 	unsigned nb_ports;
 	uint8_t portid;
 
-    /* Generate random flowgen id */
-    srand(time(NULL));
-    flowgen_id = (uint32_t)rand();
+	/* Generate random flowgen id */
+	srand(time(NULL));
+	flowgen_id = (uint32_t)rand();
 
 	/* Initialize the Environment Abstraction Layer (EAL). */
 	int ret = rte_eal_init(argc, argv);
