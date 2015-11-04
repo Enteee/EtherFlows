@@ -8,12 +8,13 @@ import xml.sax
 import socket
 import os
 
-#MAC Addr of the flow generator 
 DATA_MAXLEN = 200
 DATA_TOO_LONG = 'Data too long'
 FLOW_BUFFER_TIME = 3
 STANDALONE_FILE = '/vagrant/sys/standalone'
 DEBUG = False
+HOSTNAME=socket.gethostname()
+
 
 parser = argparse.ArgumentParser(description='Flowworker')
 
@@ -64,7 +65,8 @@ class Flow():
 
     def add_frame(self, frame):
         frame['env_flowid'] = self.__flowid_mac
-        frame['env_host'] = args.interface
+        frame['env_hostname'] = HOSTNAME
+        frame['env_interface'] = args.interface
         if not args.standalone:
             frame['env_flowgen'] = self.__flowgen
         # check if packet expands flow length
