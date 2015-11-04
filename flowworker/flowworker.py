@@ -57,6 +57,7 @@ class Flow():
 
     def add_frame(self, frame):
         frame['env_flowid'] = self.__flowid_mac
+        frame['env_host'] = args.interface
         if not args.standalone:
             frame['env_flowgen'] = self.__flowgen
         # check if packet expands flow length
