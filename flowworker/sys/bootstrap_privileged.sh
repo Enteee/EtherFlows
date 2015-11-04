@@ -25,12 +25,12 @@ pacman --needed --noconfirm -S  jdk8-openjdk \
                                 wireshark-cli \
                                 libpcap \
                                 tcpdump \
-                                scapy \
                                 wget \
                                 ruby \
                                 python2-configargparse \
                                 ntp \
                                 htop \
+                                avahi \
                                 vim
 # Ruby bundler
 gem install bundler
@@ -46,6 +46,9 @@ sysctl -w net.ipv6.conf.enp0s9.disable_ipv6=1
 cat << EOF > /etc/sysctl.d/disable_ipv6.conf
 net.ipv6.conf.enp0s9.disable_ipv6 = 1
 EOF
+
+# Obtain ip on cluster interface 
+avahi-autoipd -D enp0s8
 
 # Set RAW_capabilities for python, so thwt we can send packets back
 setcap 'CAP_NET_RAW+eip' /usr/bin/python2.7

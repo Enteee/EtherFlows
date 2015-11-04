@@ -11,8 +11,9 @@ import os
 #MAC Addr of the flow generator 
 DATA_MAXLEN = 200
 DATA_TOO_LONG = 'Data too long'
-FLOW_BUFFER_TIME = 0
+FLOW_BUFFER_TIME = 3
 STANDALONE_FILE = '/vagrant/sys/standalone'
+DEBUG = False
 
 parser = argparse.ArgumentParser(description='Flowworker')
 
@@ -25,7 +26,7 @@ parser.add_argument('-i',
 parser.add_argument('-S',
                     default=os.path.isfile(STANDALONE_FILE),
                     dest='standalone',
-                    action="store_true",
+                    action='store_true',
                     help='Enable standalone mode'
                     )
 parser.add_argument('-l',
@@ -39,6 +40,12 @@ parser.add_argument('-t',
                     type=int,
                     dest='flow_buffer_time',
                     help='Lenght (in seconds) to buffer a flow before writing the packets [default: {}]'.format(FLOW_BUFFER_TIME)
+                    )
+parser.add_argument('-d',
+                    default=DEBUG,
+                    dest='debug',
+                    action='store_true',
+                    help='Debug mode'
                     )
 class Flow():
 
@@ -64,13 +71,18 @@ class Flow():
         self.__first_frame_time = min(self.__first_frame_time, frame['frame_time_epoch'])
         self.__newest_frame_time = max(self.__newest_frame_time, frame['frame_time_epoch'])
         Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, frame['frame_time_epoch'])
+        if args.debug:
+            print('[{}] flow {} duration: {}'.format(
+                Flow.newest_overall_frame_time,
+                self.__flowid_mac,
+                self.__newest_frame_time - self.__first_frame_time))
         if self.__flushed:
             self._write_frame(frame)
         else:
             # Buffer packet
             self.__frames.append(frame)
             flow_length = self.__newest_frame_time - self.__first_frame_time
-            if flow_length > args.flow_buffer_time:
+            if flow_length >= args.flow_buffer_time:
                 self.flush()
 
     def not_expired(self):
@@ -141,6 +153,12 @@ class PdmlHandler(xml.sax.ContentHandler):
     # Call when an elements ends
     def endElement(self, tag):
         # clean up expired flows
+        if args.debug:
+            for (flowid, flow) in self.__flows.items():
+                if not flow.not_expired():
+                    print("[{}] expired: {}".format(
+                        Flow.newest_overall_frame_time,
+                        flowid))
         self.__flows = { flowid: flow for (flowid, flow) in self.__flows.items() if flow.not_expired() }
         if tag == 'packet':
             try:
@@ -148,9 +166,17 @@ class PdmlHandler(xml.sax.ContentHandler):
                 try: 
                     flow = self.__flows[flowid]
                     self.__flows[flowid].add_frame(self.__frame)
+                    if args.debug:
+                        print("[{}] oldflow: {}".format(
+                            Flow.newest_overall_frame_time,
+                            flowid))
                 except KeyError:
                     # flow unknown add new flow
                     self.__flows[flowid] = Flow(self.__frame)
+                    if args.debug:
+                        print("[{}] newflow: {}".format(
+                            Flow.newest_overall_frame_time,
+                            flowid))
             except KeyError:
                 pass
 
