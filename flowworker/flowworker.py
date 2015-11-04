@@ -11,7 +11,7 @@ import os
 #MAC Addr of the flow generator 
 DATA_MAXLEN = 200
 DATA_TOO_LONG = 'Data too long'
-FLOW_BUFFER_TIME = 3
+FLOW_BUFFER_TIME = 0
 STANDALONE_FILE = '/vagrant/sys/standalone'
 
 parser = argparse.ArgumentParser(description='Flowworker')
@@ -47,22 +47,22 @@ class Flow():
 
     def __init__(self, first_frame):
         self.__frames = []
-        self.__flowid_mac = first_frame['eth.dst']
-        self.__flowgen_mac = first_frame['eth.src']
+        self.__flowid_mac = first_frame['eth_dst']
+        self.__flowgen_mac = first_frame['eth_src']
         self.__flowgen = "0x{3}{4}{5}".format(*self.__flowgen_mac.split(':'))
         self.__flushed = False
-        self.__newest_frame_time = self.__first_frame_time = first_frame['frame.time_epoch']
+        self.__newest_frame_time = self.__first_frame_time = first_frame['frame_time_epoch']
         self.add_frame(first_frame)
         self.__send_ack()
 
     def add_frame(self, frame):
-        frame['env.flowid'] = self.__flowid_mac
+        frame['env_flowid'] = self.__flowid_mac
         if not args.standalone:
-            frame['env.flowgen'] = self.__flowgen
+            frame['env_flowgen'] = self.__flowgen
         # check if packet expands flow length
-        self.__first_frame_time = min(self.__first_frame_time, frame['frame.time_epoch'])
-        self.__newest_frame_time = max(self.__newest_frame_time, frame['frame.time_epoch'])
-        Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, frame['frame.time_epoch'])
+        self.__first_frame_time = min(self.__first_frame_time, frame['frame_time_epoch'])
+        self.__newest_frame_time = max(self.__newest_frame_time, frame['frame_time_epoch'])
+        Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, frame['frame_time_epoch'])
         if self.__flushed:
             self._write_frame(frame)
         else:
@@ -123,7 +123,7 @@ class PdmlHandler(xml.sax.ContentHandler):
             self.__frame = {}
         else:
             if attributes.has_key('name'):
-                name = attributes.getValue('name')
+                name = attributes.getValue('name').replace('.','_')
                 # Extract raw data
                 if attributes.has_key('show'):
                     show = attributes.getValue('show')
@@ -135,7 +135,7 @@ class PdmlHandler(xml.sax.ContentHandler):
                     showname = attributes.getValue('showname')
                     if len(showname) > args.data_maxlen:
                         showname = DATA_TOO_LONG
-                    self.__frame['{}.show'.format(name)] = showname
+                    self.__frame['{}_show'.format(name)] = showname
 
     # Call when an elements ends
     def endElement(self, tag):
@@ -143,7 +143,7 @@ class PdmlHandler(xml.sax.ContentHandler):
         self.__flows = { flowid: flow for (flowid, flow) in self.__flows.items() if flow.not_expired() }
         if tag == 'packet':
             try:
-                flowid = self.__frame['eth.dst']
+                flowid = self.__frame['eth_dst']
                 try: 
                     flow = self.__flows[flowid]
                     self.__flows[flowid].add_frame(self.__frame)
