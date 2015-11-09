@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <unistd.h>
 
 #include <rte_eal.h>
 #include <rte_ethdev.h>
@@ -43,6 +44,7 @@
 #include <rte_lcore.h>
 #include <rte_mbuf.h>
 #include <rte_ether.h>
+#include <rte_kvargs.h>
 
 #define RX_RING_SIZE 128
 #define TX_RING_SIZE 512
@@ -50,6 +52,10 @@
 #define NUM_MBUFS 8191
 #define MBUF_CACHE_SIZE 250
 #define BURST_SIZE 32
+
+#define UNUSED(x) (void)(x)
+
+static const char *ARG_KEYS[] = {"id"};
 
 static const struct rte_eth_conf port_conf_default = {
 	.rxmode = {
@@ -200,6 +206,14 @@ lcore_main(void)
 	}
 }
 
+static int handle_id_arg(const char *key, const char *value, void *opaque){
+	UNUSED(opaque);
+	if(strncmp(key, ARG_KEYS[0], strlen(key)) == 0){
+		flowgen_id = strtol(value, NULL, 0); 
+	}
+	return 0;
+}
+
 /*
  * The main function, which does initialization and calls the per-lcore
  * functions.
@@ -207,9 +221,11 @@ lcore_main(void)
 int
 main(int argc, char *argv[])
 {
+	struct rte_kvargs* kvargs;
 	struct rte_mempool *mbuf_pool;
 	unsigned nb_ports;
 	uint8_t portid;
+
 
 	/* Generate random flowgen id */
 	srand(time(NULL));
@@ -222,6 +238,30 @@ main(int argc, char *argv[])
 
 	argc -= ret;
 	argv += ret;
+
+	if(argc == 2){
+		kvargs = rte_kvargs_parse (
+			argv[1],
+			ARG_KEYS
+		);
+
+		if(kvargs == NULL)
+			rte_exit(EXIT_FAILURE, "Argument parsing faled\n");
+
+		ret = rte_kvargs_process (
+			kvargs,
+			ARG_KEYS[0],
+			handle_id_arg,
+			NULL 
+		);
+
+		if(ret < 0) 
+			rte_exit(EXIT_FAILURE, "Argument processing failed\n");
+	} else if(argc > 2){
+		rte_exit(EXIT_FAILURE, "Too many arguments\n");
+	}
+
+	printf("Flowgen id: %u\n", flowgen_id);
 
 	/* Check that there is an even number of ports to send/receive on. */
 	nb_ports = rte_eth_dev_count();

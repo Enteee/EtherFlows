@@ -18,7 +18,7 @@
                 }
             } ],
             "_source": { "compress": true },
-             "properties" : {
+            "properties" : {
                 "ip.src.geoip" : {
                     "type" : "object",
                     "dynamic": true,
