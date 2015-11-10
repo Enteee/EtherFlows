@@ -44,6 +44,14 @@ function pcap_filter() {
     fi
 }
 
+function flowworker_args() {
+    # Write pcap-filter
+    if ${STANDALONE}; then
+        # Standalone: run in standalone mode
+        echo "-S"
+    fi
+}
+
 trap sigint SIGINT
 function sigint(){
     RUNNING=false
@@ -117,7 +125,7 @@ until nc -z localhost 5000; do echo "Waiting for logstash..."; sleep 1;done
 while ${RUNNING}; do 
     sudo sh -c "
         tshark -i '${SNIFFING_INTERFACE}' -q -lT pdml '$(pcap_filter)' | \
-        ${WORK_DIR}/flowworker.py -i '${SNIFFING_INTERFACE}' | \
+        ${WORK_DIR}/flowworker.py -i '${SNIFFING_INTERFACE}' $(flowworker_args) | \
         nc localhost 5000
     " &> /dev/null
 done
