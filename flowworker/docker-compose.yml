@@ -1,23 +1,33 @@
 elasticsearch:
-  build: elasticsearch/
-  command: elasticsearch -Des.network.host=_non_loopback:ipv4_ -Des.discovery.zen.ping.unicast.hosts=192.168.0.1:9300-9400
-  ports:
-    - "9200:9200"
-    - "9300:9300"
+    container_name: elasticsearch
+    build: elasticsearch/
+    command: elasticsearch
+    volumes:
+        - ./elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+    ports:
+        - "9200:9200"
+        - "9300:9300"
+    environment:
+        - ES_ZEN_UNICAST_HOST
+        - ES_HEAP_SIZE
+
 logstash:
-  image: logstash:latest
-  command: logstash -f /etc/logstash/conf.d/logstash.conf -l /tmp/logstash.log
-  volumes:
-    - ./logstash/config:/etc/logstash/conf.d
-  ports:
-    - "5000:5000"
-  links:
-    - elasticsearch
+    container_name: logstash
+    image: logstash:latest
+    command: logstash -f /etc/logstash/conf.d/logstash.conf -l /tmp/logstash.log
+    volumes:
+        - ./logstash/config:/etc/logstash/conf.d
+    ports:
+        - "5000:5000"
+    links:
+        - elasticsearch
+
 kibana:
-  build: kibana/
-  volumes:
-    - ./kibana/config/kibana.yml:/opt/kibana/config/kibana.yml
-  ports:
-    - "5601:5601"
-  links:
-    - elasticsearch
+    container_name: kibana
+    build: kibana/
+    volumes:
+        - ./kibana/config/kibana.yml:/opt/kibana/config/kibana.yml
+    ports:
+        - "5601:5601"
+    links:
+        - elasticsearch

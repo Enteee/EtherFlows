@@ -1,59 +1,58 @@
 #!/usr/bin/env bash
-CLUSTER_INTERFACE=""
-CLUSTER_INTERFACE_GIVEN=false
-INTERFACE_GIVEN=false
-IGNORED_INTERFACES="lo"
-INSTANCE_DIR="./instances"
 WORK_DIR="$(pwd)"
-STOP=false
+FLOWGEN_ID="0xBADA5500"
 AUTOMATIC=false
 STANDALONE=false
-STANDALONE_FILE="sys/standalone"
+SNIFFING_INTERFACE=""
+GOSSIP_IP="127.0.0.1"
+ES_HEAP_SIZE="4g"
 
 UNAME=$(uname -s)
-PUBLIC_NETWORK_IDENTIFIER='config\.vm\.network "public_network"'
+ELK_STACK=true
 
 function usage {
     cat << EOF
-    usage: ${0} -c interface [OPTIONS]
+    usage: ${0} -i interface [OPTIONS]
     OPTIONS:
-        -c interface    :   Cluster interface (mandatory, not repeated)
-        -i interface    :   Sniffing interfaces (repeated)
-        -d instance dir :   Instance directory
-        -w workdir      :   Set the workdir (must contain Vagrantfile)
+        -i interface    :   Sniffing interface
+        -g gossip ip    :   IP of an ES instance which acts as a gossip router for the cluster
+        -H heap size    :   Elasticsearch maximum heap size
         -a              :   Automatic provisioning
+        -s              :   Starts the flowworker without a ELK environment
+        -S              :   Starts the script in standalone (no flowgen) mode
         -h              :   Print this help
-        -s              :   Stops all the VMs
-        -S              :   Start all the VMs in standalone mode
 EOF
 }
 
-function enter {
+function enter() {
     if ! ${AUTOMATIC}; then
         echo "[ENTER]"
         read
     fi
 }
 
-
-if [ ${UNAME} == "Darwin" ]; then 
-    echo "OS X is currently not supported"
-    exit 1
-fi
+function pcap_filter() {
+    # Write pcap-filter
+    if ${STANDALONE}; then
+        # Standalone filter ES/Logstash/Kibana traffic
+        echo "port not 9200 and port not 9300 and port not 5000 and port not 5601"
+    else
+        # Flowgen: only accept traffic from flowgen
+        echo "(ether [6:4] & 0xffffff00 = ${FLOWGEN_ID})"
+    fi
+}
 
 #Options options
-while getopts "c:i:d:w:asSh" opt; do
+while getopts "i:g:H:asSh" opt; do
     case $opt in
-    c)
-        CLUSTER_INTERFACE="${OPTARG}"
-        CLUSTER_INTERFACE_GIVEN=true
-    ;;
     i)
-        INTERFACES="${INTERFACES} ${OPTARG}"
-        INTERFACE_GIVEN=true
+        SNIFFING_INTERFACE="${OPTARG}"
     ;;
-    d)
-        INSTANCE_DIR="${OPTARG}"
+    g)
+        GOSSIP_IP="${OPTARG}"
+    ;;
+    H)
+        ES_HEAP_SIZE="${OPTARG}"
     ;;
     w)
         WORK_DIR="${OPTARG}"
@@ -62,14 +61,14 @@ while getopts "c:i:d:w:asSh" opt; do
         AUTOMATIC=true
     ;;
     s)
-        STOP=true
+        ELK_STACK=false
+    ;;
+    S)
+        STANDALONE=true
     ;;
     h)
         usage
         exit 0;
-    ;;
-    S)
-        STANDALONE=true
     ;;
     \?)
         echo "Invalid option: -${OPTARG}"
@@ -80,53 +79,40 @@ while getopts "c:i:d:w:asSh" opt; do
 done
 shift $(expr $OPTIND - 1 )
 
-if ! ${CLUSTER_INTERFACE_GIVEN}; then
-    echo "No cluster interface given"
+if ! ip link show "${SNIFFING_INTERFACE}" &>/dev/null; then
+    echo "Invalid sniffing interface: ${SNIFFING_INTERFACE}"
     usage
     exit 1
 fi
 
-if [ ! -e "${WORK_DIR}/Vagrantfile" ];then
+if  [ ! -e "${WORK_DIR}/docker-compose.yml" ] && 
+    [ ! -e "${WORK_DIR}/flowworker.py" ] ;then
     echo "Invalid work dir: ${WORK_DIR}"
     usage
     exit 1
 fi
 
-if ! ${INTERFACE_GIVEN} ; then
-    INTERFACES=$(ip link show | \
-        sed -nre 's/^[0-9]+: (.+?): .*/\1/p' | \
-        grep -v "${IGNORED_INTERFACES}")
+#to the work dir
+cd "${WORK_DIR}"
+
+# start docker if needed
+if ${ELK_STACK}; then
+    (
+    export ES_ZEN_UNICAST_HOST="${GOSSIP_IP}" && \
+    export ES_HEAP_SIZE="${ES_HEAP_SIZE}"  && \
+    sudo -E docker-compose up 
+    ) &
 fi
 
-cat << EOF
-Cluster interface:
-${CLUSTER_INTERFACE}
-Sniffing interfaces:
-${INTERFACES}
-EOF
-enter
+# wait until logstash is accepting input
+until nc -z localhost 5000; do sleep 0.1;done
 
-for i in ${INTERFACES}; do
-    instance="${INSTANCE_DIR}/${i}"
-    interface=$(tr -d " " <<< ${i})
-    hostname="$(hostname -s).${interface}"
+sudo sh -c "
+    tshark -i '${SNIFFING_INTERFACE}' -q -lT pdml '$(pcap_filter)' | \
+    ${WORK_DIR}/flowworker.py -i '${SNIFFING_INTERFACE}' | \
+    nc localhost 5000
+"
 
-    export VAGRANT_CLUSTER_INTERFACE="${CLUSTER_INTERFACE}"
-    export VAGRANT_SNIFF_INTERFACE="${interface}"
-    export VAGRANT_HOSTNAME="${hostname}"
-
-    mkdir -p "${instance}"
-    ( cd "${instance}" && vagrant destroy -f)
-    rm -rf "${instance}"
-    if ! ${STOP}; then
-        # create directory structure
-        cd "${WORK_DIR}"
-        find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
-        find . -path "${INSTANCE_DIR}" -prune -o -type f -exec ln "${WORK_DIR}/{}" "${instance}/{}" \;
-        cd "${instance}"
-        if ${STANDALONE}; then
-            touch "${STANDALONE_FILE}"
-        fi
-        vagrant up
-    fi
-done
+if ${ELK_STACK}; then
+    sudo docker-compose stop
+fi
