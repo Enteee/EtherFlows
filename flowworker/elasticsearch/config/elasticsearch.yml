@@ -1,0 +1,9 @@
+cluster.name: EtherFlows
+
+################################## Networking ################################
+network.host: _non_loopback:ipv4_
+discovery.zen.ping.unicast.hosts: ${ES_ZEN_UNICAST_HOST}
+
+################################## RAM ################################
+indices.fielddata.cache.size:  40%
+
