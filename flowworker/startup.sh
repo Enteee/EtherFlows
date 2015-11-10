@@ -102,10 +102,10 @@ if ${ELK_STACK}; then
     export ES_HEAP_SIZE="${ES_HEAP_SIZE}"  && \
     sudo -E docker-compose up 
     ) &
-fi
 
-# wait until logstash is accepting input
-until nc -z localhost 5000; do sleep 0.1;done
+    # wait until logstash is accepting input
+    until nc -z localhost 5000; do sleep 0.1;done
+fi
 
 sudo sh -c "
     tshark -i '${SNIFFING_INTERFACE}' -q -lT pdml '$(pcap_filter)' | \
