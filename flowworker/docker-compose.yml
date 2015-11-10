@@ -1,0 +1,23 @@
+elasticsearch:
+  build: elasticsearch/
+  command: elasticsearch -Des.network.host=_non_loopback:ipv4_ -Des.discovery.zen.ping.unicast.hosts=192.168.0.1:9300-9400
+  ports:
+    - "9200:9200"
+    - "9300:9300"
+logstash:
+  image: logstash:latest
+  command: logstash -f /etc/logstash/conf.d/logstash.conf -l /tmp/logstash.log
+  volumes:
+    - ./logstash/config:/etc/logstash/conf.d
+  ports:
+    - "5000:5000"
+  links:
+    - elasticsearch
+kibana:
+  build: kibana/
+  volumes:
+    - ./kibana/config/kibana.yml:/opt/kibana/config/kibana.yml
+  ports:
+    - "5601:5601"
+  links:
+    - elasticsearch

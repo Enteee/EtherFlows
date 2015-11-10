@@ -1,0 +1,7 @@
+#
+# Environment variables
+#
+
+# Environment setup
+export ES_HEAP_SIZE=4g
+
