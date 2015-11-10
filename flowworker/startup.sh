@@ -10,6 +10,8 @@ ES_HEAP_SIZE="4g"
 UNAME=$(uname -s)
 ELK_STACK=true
 
+RUNNING=true
+
 function usage {
     cat << EOF
     usage: ${0} -i interface [OPTIONS]
@@ -35,11 +37,16 @@ function pcap_filter() {
     # Write pcap-filter
     if ${STANDALONE}; then
         # Standalone filter ES/Logstash/Kibana traffic
-        echo "port not 9200 and port not 9300 and port not 5000 and port not 5601"
+        echo "(port not 9200 and port not 9300 and port not 5000 and port not 5601)"
     else
         # Flowgen: only accept traffic from flowgen
         echo "(ether [6:4] & 0xffffff00 = ${FLOWGEN_ID})"
     fi
+}
+
+trap sigint SIGINT
+function sigint(){
+    RUNNING=false
 }
 
 #Options options
@@ -107,11 +114,13 @@ fi
 # wait until logstash is accepting input
 until nc -z localhost 5000; do echo "Waiting for logstash..."; sleep 1;done
 
-sudo sh -c "
-    tshark -i '${SNIFFING_INTERFACE}' -q -lT pdml '$(pcap_filter)' | \
-    ${WORK_DIR}/flowworker.py -i '${SNIFFING_INTERFACE}' | \
-    nc localhost 5000
-"
+while ${RUNNING}; do 
+    sudo sh -c "
+        tshark -i '${SNIFFING_INTERFACE}' -q -lT pdml '$(pcap_filter)' | \
+        ${WORK_DIR}/flowworker.py -i '${SNIFFING_INTERFACE}' | \
+        nc localhost 5000
+    " &> /dev/null
+done
 
 if ${ELK_STACK}; then
     sudo docker-compose stop
