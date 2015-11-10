@@ -4,7 +4,9 @@ FLOWGEN_ID="0xBADA5500"
 AUTOMATIC=false
 STANDALONE=false
 SNIFFING_INTERFACE=""
-GOSSIP_IP="127.0.0.1"
+
+ES_GOSSIP_IP="127.0.0.1"
+ES_PUBLISH_HOST="127.0.0.1"
 ES_HEAP_SIZE="4g"
 
 UNAME=$(uname -s)
@@ -18,6 +20,7 @@ function usage {
     OPTIONS:
         -i interface    :   Sniffing interface
         -g gossip ip    :   IP of an ES instance which acts as a gossip router for the cluster
+        -p publis ip    :   IP which should be published in the ES cluster
         -H heap size    :   Elasticsearch maximum heap size
         -a              :   Automatic provisioning
         -s              :   Starts the flowworker without a ELK environment
@@ -58,13 +61,16 @@ function sigint(){
 }
 
 #Options options
-while getopts "i:g:H:asSh" opt; do
+while getopts "i:g:p:H:asSh" opt; do
     case $opt in
     i)
         SNIFFING_INTERFACE="${OPTARG}"
     ;;
     g)
-        GOSSIP_IP="${OPTARG}"
+        ES_GOSSIP_IP="${OPTARG}"
+    ;;
+    p)
+        ES_PUBLISH_HOST="${OPTARG}"
     ;;
     H)
         ES_HEAP_SIZE="${OPTARG}"
@@ -113,14 +119,12 @@ cd "${WORK_DIR}"
 # start docker if needed
 if ${ELK_STACK}; then
     (
-    export ES_ZEN_UNICAST_HOST="${GOSSIP_IP}" && \
+    export ES_ZEN_UNICAST_HOST="${ES_GOSSIP_IP}" && \
+    export ES_PUBLISH_HOST="${ES_PUBLISH_HOST}"  && \
     export ES_HEAP_SIZE="${ES_HEAP_SIZE}"  && \
     sudo -E docker-compose up 
     ) &
 fi
-
-# wait until logstash is accepting input
-until nc -z localhost 5000; do echo "Waiting for logstash..."; sleep 1;done
 
 while ${RUNNING}; do 
     sudo sh -c "

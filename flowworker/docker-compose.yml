@@ -9,6 +9,7 @@ elasticsearch:
         - "9300:9300"
     environment:
         - ES_ZEN_UNICAST_HOST
+        - ES_PUBLISH_HOST
         - ES_HEAP_SIZE
 
 logstash:

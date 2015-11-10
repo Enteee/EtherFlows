@@ -2,6 +2,8 @@ cluster.name: EtherFlows
 
 ################################## Networking ################################
 network.host: _non_loopback:ipv4_
+network.publish_host: ${ES_PUBLISH_HOST}
+
 discovery.zen.ping.unicast.hosts: ${ES_ZEN_UNICAST_HOST}
 
 ################################## RAM ################################
