@@ -51,7 +51,7 @@ function flowworker_args() {
     # Write pcap-filter
     if ${STANDALONE}; then
         # Standalone: run in standalone mode
-        echo "-S"
+        echo "-S -t0"
     fi
 }
 
@@ -134,6 +134,3 @@ while ${RUNNING}; do
     " &> /dev/null
 done
 
-if ${ELK_STACK}; then
-    sudo docker-compose stop
-fi

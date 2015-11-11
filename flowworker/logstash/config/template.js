@@ -17,29 +17,67 @@
                     }
                 }
             } ],
-            "properties" : {
-                "ip_src_geoip" : {
-                    "type" : "object",
-                    "dynamic": true,
-                    "properties" : {
-                        "ip": { "type": "ip"},
-                        "location" : { "type" : "geo_point"},
-                        "latitude" : { "type" : "float"},
-                        "longitude" : { "type" : "float"}
+            "properties": {
+                "ip": {
+                    "properties": {
+                        "dst": {
+                            "properties": {
+                                "raw" : { "type" : "ip" },
+                                "geoip": {
+                                    "properties": {
+                                        "ip": { "type": "ip"},
+                                        "location" : { "type" : "geo_point"},
+                                        "latitude" : { "type" : "float"},
+                                        "longitude" : { "type" : "float"}
+                                    }
+                                }
+                            }
+                        },
+                        "src": {
+                            "properties": {
+                                "raw" : { "type" : "ip" },
+                                "geoip": {
+                                    "properties": {
+                                        "ip": { "type": "ip"},
+                                        "location" : { "type" : "geo_point"},
+                                        "latitude" : { "type" : "float"},
+                                        "longitude" : { "type" : "float"}
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
-                "ip_dst_geoip" : {
-                    "type" : "object",
-                    "dynamic": true,
-                    "properties" : {
-                        "ip": { "type": "ip"},
-                        "location" : { "type" : "geo_point"},
-                        "latitude" : { "type" : "float"},
-                        "longitude" : { "type" : "float"}
+                "ipv6": {
+                    "properties": {
+                        "dst": {
+                            "properties": {
+                                "raw" : { "type" : "string" },
+                                "geoip": {
+                                    "properties": {
+                                        "ip": { "type": "string"},
+                                        "location" : { "type" : "geo_point"},
+                                        "latitude" : { "type" : "float"},
+                                        "longitude" : { "type" : "float"}
+                                    }
+                                }
+                            }
+                        },
+                        "src": {
+                            "properties": {
+                                "raw" : { "type" : "string" },
+                                "geoip": {
+                                    "properties": {
+                                        "ip": { "type": "string"},
+                                        "location" : { "type" : "geo_point"},
+                                        "latitude" : { "type" : "float"},
+                                        "longitude" : { "type" : "float"}
+                                    }
+                                }
+                            }
+                        }
                     }
-                },
-                "dhcpv6_iaid" : { "type" : "string", "index" : "not_analyzed" },
-                "bootp_option_value" : { "type" : "string", "index" : "not_analyzed" }
+                }
             }
         }
     }

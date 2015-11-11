@@ -15,7 +15,7 @@ elasticsearch:
 logstash:
     container_name: logstash
     image: logstash:latest
-    command: logstash -f /etc/logstash/conf.d/logstash.conf -l /tmp/logstash.log
+    command: logstash -f /etc/logstash/conf.d/logstash.conf
     volumes:
         - ./logstash/config:/etc/logstash/conf.d
     ports:
