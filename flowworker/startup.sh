@@ -131,6 +131,6 @@ while ${RUNNING}; do
         tshark -i '${SNIFFING_INTERFACE}' -q -lT pdml '$(pcap_filter)' | \
         ${WORK_DIR}/flowworker.py -i '${SNIFFING_INTERFACE}' $(flowworker_args) | \
         nc localhost 5000
-    " &> /dev/null
+    "
 done
 

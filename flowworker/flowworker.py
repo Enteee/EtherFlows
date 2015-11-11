@@ -16,6 +16,7 @@ FLOW_BUFFER_TIME = 3
 STANDALONE = False
 DEBUG = False
 HOSTNAME=socket.gethostname()
+KIBANA_NOT_SUPPORTED_CHARS = '_'
 
 
 parser = argparse.ArgumentParser(description='Flowworker')
@@ -154,6 +155,12 @@ class PdmlHandler(xml.sax.ContentHandler):
         else:
             if attributes.has_key('name'):
                 name = attributes.getValue('name')
+                # kibana does not support some characters at beginning of strings
+                try: 
+                    while name[0] in KIBANA_NOT_SUPPORTED_CHARS:
+                        name = name[1:]
+                except IndexError:
+                    pass
                 if len(name) > 0:
                     # Build object tree
                     name_access = functools.reduce(lambda x,y: x[y], [self.__frame] + name.split('.'))
