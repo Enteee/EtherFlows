@@ -74,3 +74,6 @@ bundled_plugin_ids:
  - plugins/table_vis/index
  - plugins/vis_types/index
  - plugins/visualize/index
+
+# Sense configuration
+sense.defaultServerUrl: "http://elasticsearch:9200"
