@@ -122,10 +122,14 @@ class Flow():
             socket.send(ack_frame)
 
     def _write_frame(self, frame):
-        json.dump(frame, sys.stdout)
-        sys.stdout.write('\n')
-        sys.stdout.flush()
-        self.__send_ack()
+        try:
+            json.dump(frame, sys.stdout)
+            sys.stdout.write('\n')
+            sys.stdout.flush()
+            self.__send_ack()
+        except:
+            sys.exit(1)
+            
 
 class PdmlHandler(xml.sax.ContentHandler):
     def __init__(self):
