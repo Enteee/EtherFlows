@@ -7,11 +7,13 @@ import argparse
 import xml.sax
 import socket
 import os
+import functools
+import pprint
 
 DATA_MAXLEN = 200
 DATA_TOO_LONG = 'Data too long'
 FLOW_BUFFER_TIME = 3
-STANDALONE_FILE = '/vagrant/sys/standalone'
+STANDALONE = False
 DEBUG = False
 HOSTNAME=socket.gethostname()
 
@@ -25,7 +27,7 @@ parser.add_argument('-i',
                     help='Interface to listen on'
                     )
 parser.add_argument('-S',
-                    default=os.path.isfile(STANDALONE_FILE),
+                    default=STANDALONE,
                     dest='standalone',
                     action='store_true',
                     help='Enable standalone mode'
@@ -48,6 +50,19 @@ parser.add_argument('-d',
                     action='store_true',
                     help='Debug mode'
                     )
+
+class AutoVivification(dict):
+    """
+    Implementation of perl's autovivification feature.
+    see: https://stackoverflow.com/questions/635483/what-is-the-best-way-to-implement-nested-dictionaries-in-python
+    """
+    def __getitem__(self, item):
+        try:
+            return dict.__getitem__(self, item)
+        except KeyError:
+            value = self[item] = type(self)()
+            return value
+
 class Flow():
 
     """ The overall packet time """
@@ -55,24 +70,24 @@ class Flow():
 
     def __init__(self, first_frame):
         self.__frames = []
-        self.__flowid_mac = first_frame['eth_dst']
-        self.__flowgen_mac = first_frame['eth_src']
+        self.__flowid_mac = first_frame['eth']['dst']['raw']
+        self.__flowgen_mac = first_frame['eth']['src']['raw']
         self.__flowgen = "0x{3}{4}{5}".format(*self.__flowgen_mac.split(':'))
         self.__flushed = False
-        self.__newest_frame_time = self.__first_frame_time = first_frame['frame_time_epoch']
+        self.__newest_frame_time = self.__first_frame_time = first_frame['frame']['time_epoch']['raw']
         self.add_frame(first_frame)
         self.__send_ack()
 
     def add_frame(self, frame):
-        frame['env_flowid'] = self.__flowid_mac
-        frame['env_hostname'] = HOSTNAME
-        frame['env_interface'] = args.interface
+        frame['env']['flowid']['raw'] = self.__flowid_mac
+        frame['env']['hostname']['raw'] = HOSTNAME
+        frame['env']['interface']['raw'] = args.interface
         if not args.standalone:
-            frame['env_flowgen'] = self.__flowgen
+            frame['env']['flowgen'] = self.__flowgen
         # check if packet expands flow length
-        self.__first_frame_time = min(self.__first_frame_time, frame['frame_time_epoch'])
-        self.__newest_frame_time = max(self.__newest_frame_time, frame['frame_time_epoch'])
-        Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, frame['frame_time_epoch'])
+        self.__first_frame_time = min(self.__first_frame_time, frame['frame']['time_epoch']['raw'])
+        self.__newest_frame_time = max(self.__newest_frame_time, frame['frame']['time_epoch']['raw'])
+        Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, frame['frame']['time_epoch']['raw'])
         if args.debug:
             print('[{}] flow {} duration: {}'.format(
                 Flow.newest_overall_frame_time,
@@ -135,22 +150,25 @@ class PdmlHandler(xml.sax.ContentHandler):
     # Call when an element starts
     def startElement(self, tag, attributes):
         if tag == 'packet':
-            self.__frame = {}
+            self.__frame = AutoVivification()
         else:
             if attributes.has_key('name'):
-                name = attributes.getValue('name').replace('.','_')
-                # Extract raw data
-                if attributes.has_key('show'):
-                    show = attributes.getValue('show')
-                    if len(show) > args.data_maxlen:
-                        show = DATA_TOO_LONG
-                    self.__frame[name] = self.autoconvert(show)
-                # Extract showname
-                if attributes.has_key('showname'):
-                    showname = attributes.getValue('showname')
-                    if len(showname) > args.data_maxlen:
-                        showname = DATA_TOO_LONG
-                    self.__frame['{}_show'.format(name)] = showname
+                name = attributes.getValue('name')
+                if len(name) > 0:
+                    # Build object tree
+                    name_access = functools.reduce(lambda x,y: x[y], [self.__frame] + name.split('.'))
+                    # Extract raw data
+                    if attributes.has_key('show'):
+                        show = attributes.getValue('show')
+                        if len(show) > args.data_maxlen:
+                            show = DATA_TOO_LONG
+                        name_access['raw'] = self.autoconvert(show)
+                    # Extract showname
+                    if attributes.has_key('showname'):
+                        showname = attributes.getValue('showname')
+                        if len(showname) > args.data_maxlen:
+                            showname = DATA_TOO_LONG
+                        name_access['show'] = showname
 
     # Call when an elements ends
     def endElement(self, tag):
@@ -164,7 +182,7 @@ class PdmlHandler(xml.sax.ContentHandler):
         self.__flows = { flowid: flow for (flowid, flow) in self.__flows.items() if flow.not_expired() }
         if tag == 'packet':
             try:
-                flowid = self.__frame['eth_dst']
+                flowid = self.__frame['eth']['dst']['raw']
                 try: 
                     flow = self.__flows[flowid]
                     self.__flows[flowid].add_frame(self.__frame)
