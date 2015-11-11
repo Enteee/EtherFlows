@@ -25,7 +25,6 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
     ```sh
     $ apt-get install -y docker-compose
     ```
-    
 
 3. Start [docker][docker]
 
