@@ -8,26 +8,6 @@
     "mappings": {
         "_default_": {
             "_all": { "enabled": true },
-            "dynamic_templates" : [ 
-                {
-                    "string_fields" : {
-                        "match" : "*",
-                        "unmatch" : "*show",
-                        "match_mapping_type" : "string",
-                        "mapping" : {
-                            "type" : "string", "index" : "not_analyzed", "omit_norms" : true
-                        }
-                    }
-                },{
-                    "show_fields" : {
-                        "match" : "*show",
-                        "match_mapping_type" : "string",
-                        "mapping" : {
-                            "type" : "string", "index" : "analyzed", "omit_norms" : true
-                        }
-                    }
-                }
-            ],
             "properties": {
                 "ip": {
                     "properties": {
