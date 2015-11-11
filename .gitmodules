@@ -1,0 +1,3 @@
+[submodule "flowworker/logstash/plugins/logstash-filter-json_query"]
+	path = flowworker/logstash/plugins/logstash-filter-json_query
+	url = https://github.com/Np2x/logstash-filter-json_query.git

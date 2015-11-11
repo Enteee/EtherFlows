@@ -1,6 +1,5 @@
 FROM logstash:latest
 
-
 # Copy plugin folder
 COPY plugins/ /etc/logstash/plugins/
 
