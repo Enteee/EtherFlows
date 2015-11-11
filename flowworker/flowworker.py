@@ -127,9 +127,8 @@ class Flow():
             sys.stdout.write('\n')
             sys.stdout.flush()
             self.__send_ack()
-        except:
+        except IOError:
             sys.exit(1)
-            
 
 class PdmlHandler(xml.sax.ContentHandler):
     def __init__(self):
