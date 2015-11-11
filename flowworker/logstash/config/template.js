@@ -25,10 +25,14 @@
                                 "raw" : { "type" : "ip" },
                                 "geoip": {
                                     "properties": {
-                                        "ip": { "type": "ip"},
-                                        "location" : { "type" : "geo_point"},
-                                        "latitude" : { "type" : "float"},
-                                        "longitude" : { "type" : "float"}
+                                        "raw": {
+                                            "properties" : {
+                                                "ip": { "type": "ip"},
+                                                "location" : { "type" : "geo_point"},
+                                                "latitude" : { "type" : "float"},
+                                                "longitude" : { "type" : "float"}
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -38,10 +42,14 @@
                                 "raw" : { "type" : "ip" },
                                 "geoip": {
                                     "properties": {
-                                        "ip": { "type": "ip"},
-                                        "location" : { "type" : "geo_point"},
-                                        "latitude" : { "type" : "float"},
-                                        "longitude" : { "type" : "float"}
+                                        "raw": {
+                                            "properties": {
+                                                "ip": { "type": "ip"},
+                                                "location" : { "type" : "geo_point"},
+                                                "latitude" : { "type" : "float"},
+                                                "longitude" : { "type" : "float"}
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -55,10 +63,14 @@
                                 "raw" : { "type" : "string" },
                                 "geoip": {
                                     "properties": {
-                                        "ip": { "type": "string"},
-                                        "location" : { "type" : "geo_point"},
-                                        "latitude" : { "type" : "float"},
-                                        "longitude" : { "type" : "float"}
+                                        "raw": {
+                                            "properties": {
+                                                "ip": { "type": "string"},
+                                                "location" : { "type" : "geo_point"},
+                                                "latitude" : { "type" : "float"},
+                                                "longitude" : { "type" : "float"}
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -68,10 +80,14 @@
                                 "raw" : { "type" : "string" },
                                 "geoip": {
                                     "properties": {
-                                        "ip": { "type": "string"},
-                                        "location" : { "type" : "geo_point"},
-                                        "latitude" : { "type" : "float"},
-                                        "longitude" : { "type" : "float"}
+                                        "raw": {
+                                            "properties": {
+                                                "ip": { "type": "string"},
+                                                "location" : { "type" : "geo_point"},
+                                                "latitude" : { "type" : "float"},
+                                                "longitude" : { "type" : "float"}
+                                            }
+                                        }
                                     }
                                 }
                             }
