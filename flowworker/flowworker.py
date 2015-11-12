@@ -17,6 +17,8 @@ STANDALONE = False
 DEBUG = False
 HOSTNAME=socket.gethostname()
 KIBANA_NOT_SUPPORTED_CHARS = '_'
+LOGSTASH_IP = '127.0.0.1'
+LOGSTASH_PORT = 5000
 
 
 parser = argparse.ArgumentParser(description='Flowworker')
@@ -123,12 +125,24 @@ class Flow():
 
     def _write_frame(self, frame):
         try:
-            json.dump(frame, sys.stdout)
-            sys.stdout.write('\n')
-            sys.stdout.flush()
-            self.__send_ack()
-        except IOError:
+            log_socket.send(json.dumps(frame) + '\n')
+        except:
+            print("ERROR: Could not send json object")
+            log_socket.close()
             sys.exit(1)
+        self.__send_ack()
+        
+        #try:
+        #    json.dump(frame, log_socket)
+        #    log_socket.send('\n')
+        #    self.__send_ack()
+        #except:
+        #    print('ERROR:Could not send json object to: {}:{}'.format(
+        #        LOGSTASH_IP,
+        #        LOGSTASH_PORT
+        #        ))
+        #    log_socket.close()
+        #    sys.exit(1)
 
 class PdmlHandler(xml.sax.ContentHandler):
     def __init__(self):
@@ -220,6 +234,17 @@ if ( __name__ == '__main__'):
     if not args.standalone:
         socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
         socket.bind((args.interface, 0))
+    # bind logstash socket
+    log_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        log_socket.connect((LOGSTASH_IP, LOGSTASH_PORT))
+        print("INFO: Connection established")
+    except:
+        print("ERROR: Could not connect to: {}:{}".format(
+            LOGSTASH_IP, 
+            LOGSTASH_PORT))
+        log_socket.close()
+        sys.exit(1)
     # create an XMLReader
     parser = xml.sax.make_parser()
     # turn off namepsaces
