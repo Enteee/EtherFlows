@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # vim: set fenc=utf8 ts=4 sw=4 et :
 import time 
 import sys
@@ -17,6 +17,8 @@ STANDALONE = False
 DEBUG = False
 HOSTNAME=socket.gethostname()
 KIBANA_NOT_SUPPORTED_CHARS = '_'
+LOGSTASH_CONNECT_PORT = '5000'
+LOGSTASH_CONNECT = '127.0.0.1:{}'.format(LOGSTASH_CONNECT_PORT)
 
 
 parser = argparse.ArgumentParser(description='Flowworker')
@@ -50,6 +52,11 @@ parser.add_argument('-d',
                     dest='debug',
                     action='store_true',
                     help='Debug mode'
+                    )
+parser.add_argument('-L',
+                    default=LOGSTASH_CONNECT,
+                    dest='logstash_connect',
+                    help='Logstash receiver in the format HOSTNAME[:PORT] [default: {}]'.format(LOGSTASH_CONNECT)
                     )
 
 class AutoVivification(dict):
@@ -123,12 +130,13 @@ class Flow():
 
     def _write_frame(self, frame):
         try:
-            json.dump(frame, sys.stdout)
-            sys.stdout.write('\n')
-            sys.stdout.flush()
-            self.__send_ack()
-        except IOError:
+            json_string = '{}\n'.format(json.dumps(frame))
+            log_socket.send(json_string.encode('utf-8'))
+        except Exception as e:
+            print("ERROR: Could not send json object")
+            log_socket.close()
             sys.exit(1)
+        self.__send_ack()
 
 class PdmlHandler(xml.sax.ContentHandler):
     def __init__(self):
@@ -156,10 +164,10 @@ class PdmlHandler(xml.sax.ContentHandler):
         if tag == 'packet':
             self.__frame = AutoVivification()
         else:
-            if attributes.has_key('name'):
+            if 'name' in  attributes:
                 name = attributes.getValue('name')
                 # kibana does not support some characters at beginning of strings
-                try: 
+                try:
                     while name[0] in KIBANA_NOT_SUPPORTED_CHARS:
                         name = name[1:]
                 except IndexError:
@@ -168,13 +176,13 @@ class PdmlHandler(xml.sax.ContentHandler):
                     # Build object tree
                     name_access = functools.reduce(lambda x,y: x[y], [self.__frame] + name.split('.'))
                     # Extract raw data
-                    if attributes.has_key('show'):
+                    if 'show' in attributes:
                         show = attributes.getValue('show')
                         if len(show) > args.data_maxlen:
                             show = DATA_TOO_LONG
                         name_access['raw'] = self.autoconvert(show)
                     # Extract showname
-                    if attributes.has_key('showname'):
+                    if 'showname' in attributes:
                         showname = attributes.getValue('showname')
                         if len(showname) > args.data_maxlen:
                             showname = DATA_TOO_LONG
@@ -216,10 +224,25 @@ class PdmlHandler(xml.sax.ContentHandler):
 
 if ( __name__ == '__main__'):
     args = parser.parse_args()
-    # bind socket
+    # bind raw socket
     if not args.standalone:
         socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
         socket.bind((args.interface, 0))
+    # bind logstash socket
+    (logstash_host, *logstash_port) = args.logstash_connect.split(':')
+    if len(logstash_port) == 0:
+        logstash_port = [LOGSTASH_CONNECT_PORT]
+    logstash_port = int(logstash_port[0])
+    logstash_socket = (logstash_host , logstash_port)
+    log_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    while True:
+        try:
+            log_socket.connect(logstash_socket)
+        except:
+            print("Retry connecting to: {}".format(logstash_socket))
+            time.sleep(10)
+            continue
+        break
     # create an XMLReader
     parser = xml.sax.make_parser()
     # turn off namepsaces
