@@ -10,34 +10,42 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 1. Clone this repository
 
     ```sh
-    $ git clone https://github.com/Enteee/EtherFlows.git
+    $ git clone --recursive https://github.com/Enteee/EtherFlows.git
     ```
 
-2. Download & install [Vagrant][vagrant] and [Virtualbox][virtualbox]
-3. Make sure that you have the following modules loaded:
+2. Download & install [docker-compose][docker-compose]
+  * [arch linux](https://www.archlinux.org/)
 
     ```sh
-    # cat << EOF > /etc/modules-load.d/virtualbox.conf
-    vboxdrv
-    vboxnetflt
-    vboxnetadp
-    EOF
+    $ pacman --noconfirm -S docker-compose
     ```
 
-4. Navigate to the flow worker directory
+  * apt-based, e.g: debian, ubuntu, ...
+
+    ```sh
+    $ apt-get install -y docker-compose
+    ```
+
+3. Start [docker][docker]
+
+    ```sh
+    $ systemctl start docker
+    ```
+    
+3. Navigate to the flow worker directory
 
     ```sh
     $ cd flowworker/
     ```
-5. Start the flow worker
+4. Start the flow worker
 
     ```sh
-    $ ./start_up.sh -S -c [Cluster NIC]
+    $ ./start_up.sh -S -i [SNIFFING NIC]
     ```
 
-6. Open [Kibana @ http://127.0.0.1:5601](http://127.0.0.1:5601) or [Marvel @ http://127.0.0.1:9200/_plugin/marvel/](http://127.0.0.1:9200/_plugin/marvel/kibana/index.html)
-7. Done!
-8. Join [#EtherFlows @freenode.net][irc]
+5. Open [Kibana @ http://127.0.0.1:5601](http://127.0.0.1:5601)
+6. Done!
+7. Join [#EtherFlows @freenode.net][irc]
 
 ## Requirments
 ### Analysis network
@@ -56,7 +64,7 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 
 [dpdk]:http://dpdk.org/
 [python2]:https://www.python.org/download/releases/2.7.3/
-[vagrant]:https://www.vagrantup.com/downloads.html
-[virtualbox]:https://www.virtualbox.org/
+[docker-compose]:https://docs.docker.com/compose/
+[docker]:https://www.docker.com/
 [irc]:http://webchat.freenode.net/?nick=newEtherFlowsUser&channels=EtherFlows
 [mac aging]:https://www.juniper.net/documentation/en_US/junos13.2/topics/concept/bridging-mac-aging.html

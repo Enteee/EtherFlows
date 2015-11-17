@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # vim: set fenc=utf8 ts=4 sw=4 et :
 import time 
 import sys
@@ -7,13 +7,18 @@ import argparse
 import xml.sax
 import socket
 import os
+import functools
+import pprint
 
 DATA_MAXLEN = 200
 DATA_TOO_LONG = 'Data too long'
 FLOW_BUFFER_TIME = 3
-STANDALONE_FILE = '/vagrant/sys/standalone'
+STANDALONE = False
 DEBUG = False
 HOSTNAME=socket.gethostname()
+KIBANA_NOT_SUPPORTED_CHARS = '_'
+LOGSTASH_CONNECT_PORT = '5000'
+LOGSTASH_CONNECT = '127.0.0.1:{}'.format(LOGSTASH_CONNECT_PORT)
 
 
 parser = argparse.ArgumentParser(description='Flowworker')
@@ -25,7 +30,7 @@ parser.add_argument('-i',
                     help='Interface to listen on'
                     )
 parser.add_argument('-S',
-                    default=os.path.isfile(STANDALONE_FILE),
+                    default=STANDALONE,
                     dest='standalone',
                     action='store_true',
                     help='Enable standalone mode'
@@ -48,6 +53,24 @@ parser.add_argument('-d',
                     action='store_true',
                     help='Debug mode'
                     )
+parser.add_argument('-L',
+                    default=LOGSTASH_CONNECT,
+                    dest='logstash_connect',
+                    help='Logstash receiver in the format HOSTNAME[:PORT] [default: {}]'.format(LOGSTASH_CONNECT)
+                    )
+
+class AutoVivification(dict):
+    """
+    Implementation of perl's autovivification feature.
+    see: https://stackoverflow.com/questions/635483/what-is-the-best-way-to-implement-nested-dictionaries-in-python
+    """
+    def __getitem__(self, item):
+        try:
+            return dict.__getitem__(self, item)
+        except KeyError:
+            value = self[item] = type(self)()
+            return value
+
 class Flow():
 
     """ The overall packet time """
@@ -55,24 +78,24 @@ class Flow():
 
     def __init__(self, first_frame):
         self.__frames = []
-        self.__flowid_mac = first_frame['eth_dst']
-        self.__flowgen_mac = first_frame['eth_src']
+        self.__flowid_mac = first_frame['eth']['dst']['raw']
+        self.__flowgen_mac = first_frame['eth']['src']['raw']
         self.__flowgen = "0x{3}{4}{5}".format(*self.__flowgen_mac.split(':'))
         self.__flushed = False
-        self.__newest_frame_time = self.__first_frame_time = first_frame['frame_time_epoch']
+        self.__newest_frame_time = self.__first_frame_time = first_frame['frame']['time_epoch']['raw']
         self.add_frame(first_frame)
         self.__send_ack()
 
     def add_frame(self, frame):
-        frame['env_flowid'] = self.__flowid_mac
-        frame['env_hostname'] = HOSTNAME
-        frame['env_interface'] = args.interface
+        frame['env']['flowid']['raw'] = self.__flowid_mac
+        frame['env']['hostname']['raw'] = HOSTNAME
+        frame['env']['interface']['raw'] = args.interface
         if not args.standalone:
-            frame['env_flowgen'] = self.__flowgen
+            frame['env']['flowgen'] = self.__flowgen
         # check if packet expands flow length
-        self.__first_frame_time = min(self.__first_frame_time, frame['frame_time_epoch'])
-        self.__newest_frame_time = max(self.__newest_frame_time, frame['frame_time_epoch'])
-        Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, frame['frame_time_epoch'])
+        self.__first_frame_time = min(self.__first_frame_time, frame['frame']['time_epoch']['raw'])
+        self.__newest_frame_time = max(self.__newest_frame_time, frame['frame']['time_epoch']['raw'])
+        Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, frame['frame']['time_epoch']['raw'])
         if args.debug:
             print('[{}] flow {} duration: {}'.format(
                 Flow.newest_overall_frame_time,
@@ -106,9 +129,13 @@ class Flow():
             socket.send(ack_frame)
 
     def _write_frame(self, frame):
-        json.dump(frame, sys.stdout)
-        sys.stdout.write('\n')
-        sys.stdout.flush()
+        try:
+            json_string = '{}\n'.format(json.dumps(frame))
+            log_socket.send(json_string.encode('utf-8'))
+        except Exception as e:
+            print("ERROR: Could not send json object")
+            log_socket.close()
+            sys.exit(1)
         self.__send_ack()
 
 class PdmlHandler(xml.sax.ContentHandler):
@@ -135,22 +162,31 @@ class PdmlHandler(xml.sax.ContentHandler):
     # Call when an element starts
     def startElement(self, tag, attributes):
         if tag == 'packet':
-            self.__frame = {}
+            self.__frame = AutoVivification()
         else:
-            if attributes.has_key('name'):
-                name = attributes.getValue('name').replace('.','_')
-                # Extract raw data
-                if attributes.has_key('show'):
-                    show = attributes.getValue('show')
-                    if len(show) > args.data_maxlen:
-                        show = DATA_TOO_LONG
-                    self.__frame[name] = self.autoconvert(show)
-                # Extract showname
-                if attributes.has_key('showname'):
-                    showname = attributes.getValue('showname')
-                    if len(showname) > args.data_maxlen:
-                        showname = DATA_TOO_LONG
-                    self.__frame['{}_show'.format(name)] = showname
+            if 'name' in  attributes:
+                name = attributes.getValue('name')
+                # kibana does not support some characters at beginning of strings
+                try:
+                    while name[0] in KIBANA_NOT_SUPPORTED_CHARS:
+                        name = name[1:]
+                except IndexError:
+                    pass
+                if len(name) > 0:
+                    # Build object tree
+                    name_access = functools.reduce(lambda x,y: x[y], [self.__frame] + name.split('.'))
+                    # Extract raw data
+                    if 'show' in attributes:
+                        show = attributes.getValue('show')
+                        if len(show) > args.data_maxlen:
+                            show = DATA_TOO_LONG
+                        name_access['raw'] = self.autoconvert(show)
+                    # Extract showname
+                    if 'showname' in attributes:
+                        showname = attributes.getValue('showname')
+                        if len(showname) > args.data_maxlen:
+                            showname = DATA_TOO_LONG
+                        name_access['show'] = showname
 
     # Call when an elements ends
     def endElement(self, tag):
@@ -164,7 +200,7 @@ class PdmlHandler(xml.sax.ContentHandler):
         self.__flows = { flowid: flow for (flowid, flow) in self.__flows.items() if flow.not_expired() }
         if tag == 'packet':
             try:
-                flowid = self.__frame['eth_dst']
+                flowid = self.__frame['eth']['dst']['raw']
                 try: 
                     flow = self.__flows[flowid]
                     self.__flows[flowid].add_frame(self.__frame)
@@ -188,10 +224,25 @@ class PdmlHandler(xml.sax.ContentHandler):
 
 if ( __name__ == '__main__'):
     args = parser.parse_args()
-    # bind socket
+    # bind raw socket
     if not args.standalone:
         socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
         socket.bind((args.interface, 0))
+    # bind logstash socket
+    (logstash_host, *logstash_port) = args.logstash_connect.split(':')
+    if len(logstash_port) == 0:
+        logstash_port = [LOGSTASH_CONNECT_PORT]
+    logstash_port = int(logstash_port[0])
+    logstash_socket = (logstash_host , logstash_port)
+    log_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    while True:
+        try:
+            log_socket.connect(logstash_socket)
+        except:
+            print("Retry connecting to: {}".format(logstash_socket))
+            time.sleep(10)
+            continue
+        break
     # create an XMLReader
     parser = xml.sax.make_parser()
     # turn off namepsaces
