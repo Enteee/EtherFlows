@@ -136,7 +136,7 @@ class Flow():
             ack_frame += '\x09\x00' # ethertype 
             ack_frame += 'ENTE' # payload
             ack_frame += '\x63\x07\x3d\x02' # checksum
-            socket.send(ack_frame)
+            raw_socket.send(ack_frame)
 
     def _write_frame(self, frame):
         try:
@@ -236,8 +236,8 @@ if ( __name__ == '__main__'):
     args = parser.parse_args()
     # bind raw socket
     if not args.standalone:
-        socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
-        socket.bind((args.interface, 0))
+        raw_socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
+        raw_socket.bind((args.interface, 0))
     # bind logstash socket
     (logstash_host, *logstash_port) = args.logstash_connect.split(':')
     if len(logstash_port) == 0:
