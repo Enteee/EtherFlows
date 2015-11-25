@@ -9,6 +9,8 @@ import socket
 import os
 import functools
 import pprint
+import datetime
+import pytz
 
 DATA_MAXLEN = 200
 DATA_TOO_LONG = 'Data too long'
@@ -19,6 +21,7 @@ HOSTNAME=socket.gethostname()
 KIBANA_NOT_SUPPORTED_CHARS = '_'
 LOGSTASH_CONNECT_PORT = '5000'
 LOGSTASH_CONNECT = '127.0.0.1:{}'.format(LOGSTASH_CONNECT_PORT)
+TIMEZONE = pytz.timezone(time.tzname[0])
 
 
 parser = argparse.ArgumentParser(description='Flowworker')
@@ -74,7 +77,7 @@ class AutoVivification(dict):
 class Flow():
 
     """ The overall packet time """
-    newest_overall_frame_time = 0
+    newest_overall_frame_time = datetime.datetime(datetime.MINYEAR, 1, 1, tzinfo = TIMEZONE)
 
     def __init__(self, first_frame):
         self.__frames = []
@@ -82,36 +85,43 @@ class Flow():
         self.__flowgen_mac = first_frame['eth']['src']['raw']
         self.__flowgen = "0x{3}{4}{5}".format(*self.__flowgen_mac.split(':'))
         self.__flushed = False
-        self.__newest_frame_time = self.__first_frame_time = first_frame['frame']['time_epoch']['raw']
+        self.__first_frame_time = self.__newest_frame_time = datetime.datetime.fromtimestamp(first_frame['frame']['time_epoch']['raw'], TIMEZONE)
         self.add_frame(first_frame)
         self.__send_ack()
 
     def add_frame(self, frame):
+        capture_timestamp = datetime.datetime.fromtimestamp(frame['frame']['time_epoch']['raw'], TIMEZONE)
+        processed_timestamp = datetime.datetime.now(TIMEZONE)
+        delay = processed_timestamp - capture_timestamp
+        frame['@timestamp'] = capture_timestamp.isoformat()
         frame['env']['flowid']['raw'] = self.__flowid_mac
         frame['env']['hostname']['raw'] = HOSTNAME
         frame['env']['interface']['raw'] = args.interface
+        frame['env']['processed']['raw'] = processed_timestamp.isoformat()
+        frame['env']['delay']['raw'] = delay.seconds + delay.microseconds * (10 ** -9)
         if not args.standalone:
             frame['env']['flowgen'] = self.__flowgen
         # check if packet expands flow length
-        self.__first_frame_time = min(self.__first_frame_time, frame['frame']['time_epoch']['raw'])
-        self.__newest_frame_time = max(self.__newest_frame_time, frame['frame']['time_epoch']['raw'])
-        Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, frame['frame']['time_epoch']['raw'])
+        self.__first_frame_time = min(self.__first_frame_time, capture_timestamp)
+        self.__newest_frame_time = max(self.__newest_frame_time, capture_timestamp)
+        Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, capture_timestamp)
         if args.debug:
             print('[{}] flow {} duration: {}'.format(
                 Flow.newest_overall_frame_time,
                 self.__flowid_mac,
-                self.__newest_frame_time - self.__first_frame_time))
+                (self.__newest_frame_time - self.__first_frame_time).seconds))
         if self.__flushed:
             self._write_frame(frame)
         else:
             # Buffer packet
             self.__frames.append(frame)
             flow_length = self.__newest_frame_time - self.__first_frame_time
-            if flow_length >= args.flow_buffer_time:
+            if flow_length >= datetime.timedelta(seconds=args.flow_buffer_time):
                 self.flush()
 
     def not_expired(self):
-        return self.__newest_frame_time > Flow.newest_overall_frame_time - args.flow_buffer_time
+        return self.__newest_frame_time > \
+            (Flow.newest_overall_frame_time - datetime.timedelta(seconds=args.flow_buffer_time))
 
     def flush(self):
         for p in self.__frames:
@@ -239,7 +249,8 @@ if ( __name__ == '__main__'):
         try:
             log_socket.connect(logstash_socket)
         except:
-            print("Retry connecting to: {}".format(logstash_socket))
+            if args.debug:
+                print("Retry connecting to: {}".format(logstash_socket))
             time.sleep(10)
             continue
         break
