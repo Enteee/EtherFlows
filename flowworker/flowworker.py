@@ -93,6 +93,7 @@ class Flow():
         capture_timestamp = datetime.datetime.fromtimestamp(frame['frame']['time_epoch']['raw'], TIMEZONE)
         processed_timestamp = datetime.datetime.now(TIMEZONE)
         delay = processed_timestamp - capture_timestamp
+        flow_length = self.__newest_frame_time - self.__first_frame_time
         frame['@timestamp'] = capture_timestamp.isoformat()
         frame['env']['flowid']['raw'] = self.__flowid_mac
         frame['env']['hostname']['raw'] = HOSTNAME
@@ -106,16 +107,16 @@ class Flow():
         self.__newest_frame_time = max(self.__newest_frame_time, capture_timestamp)
         Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, capture_timestamp)
         if args.debug:
-            print('[{}] flow {} duration: {}'.format(
+            print('[{}] flow:{}, length: {} seconds, flushed:{}'.format(
                 Flow.newest_overall_frame_time,
                 self.__flowid_mac,
-                (self.__newest_frame_time - self.__first_frame_time).seconds))
+                flow_length,
+                self.__flushed))
         if self.__flushed:
             self._write_frame(frame)
         else:
             # Buffer packet
             self.__frames.append(frame)
-            flow_length = self.__newest_frame_time - self.__first_frame_time
             if flow_length >= datetime.timedelta(seconds=args.flow_buffer_time):
                 self.flush()
 
@@ -215,14 +216,14 @@ class PdmlHandler(xml.sax.ContentHandler):
                     flow = self.__flows[flowid]
                     self.__flows[flowid].add_frame(self.__frame)
                     if args.debug:
-                        print("[{}] oldflow: {}".format(
+                        print("\n[{}] oldflow: {}".format(
                             Flow.newest_overall_frame_time,
                             flowid))
                 except KeyError:
                     # flow unknown add new flow
                     self.__flows[flowid] = Flow(self.__frame)
                     if args.debug:
-                        print("[{}] newflow: {}".format(
+                        print("\n[{}] newflow: {}".format(
                             Flow.newest_overall_frame_time,
                             flowid))
             except KeyError:
