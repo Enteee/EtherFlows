@@ -107,7 +107,7 @@ class Flow():
         self.__newest_frame_time = max(self.__newest_frame_time, capture_timestamp)
         Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, capture_timestamp)
         if args.debug:
-            print('[{}] flow:{}, length: {} seconds, flushed:{}'.format(
+            print('[{}] add_frame, flow:{}, length: {} seconds, flushed:{}'.format(
                 Flow.newest_overall_frame_time,
                 self.__flowid_mac,
                 flow_length,
@@ -119,7 +119,7 @@ class Flow():
             self.__frames.append(frame)
             if flow_length >= datetime.timedelta(seconds=args.flow_buffer_time):
                 if args.debug:
-                    print("[{}] flusing: {}".format(
+                    print("[{}] flusing flow, flowid: {}".format(
                         Flow.newest_overall_frame_time,
                         self.__flowid_mac))
                 self.flush()
@@ -192,7 +192,7 @@ class PdmlHandler(xml.sax.ContentHandler):
                     name_access = functools.reduce(lambda x,y: x[y], [self.__frame] + name.split('.'))
                     if(not isinstance(name_access, dict)):
                         if(args.debug):
-                            print("[{}] name not a dict: {}".format(
+                            print("[{}] name not a dict, name: {}".format(
                                 Flow.newest_overall_frame_time,
                                 name))
                         return;
@@ -215,26 +215,22 @@ class PdmlHandler(xml.sax.ContentHandler):
         if args.debug:
             for (flowid, flow) in self.__flows.items():
                 if not flow.not_expired():
-                    print("[{}] expired: {}".format(
+                    print("[{}] flow expired, flowid: {}".format(
                         Flow.newest_overall_frame_time,
                         flowid))
         self.__flows = { flowid: flow for (flowid, flow) in self.__flows.items() if flow.not_expired() }
         if tag == 'packet':
             try:
                 flowid = self.__frame['eth']['dst']['raw']
+                if args.debug:
+                    print("[{}] new packet, flowid: {}".format(
+                        Flow.newest_overall_frame_time,
+                        flowid))
                 try: 
                     flow = self.__flows[flowid]
                     self.__flows[flowid].add_frame(self.__frame)
-                    if args.debug:
-                        print("\n[{}] oldflow: {}".format(
-                            Flow.newest_overall_frame_time,
-                            flowid))
                 except KeyError:
                     # flow unknown add new flow
-                    if args.debug:
-                        print("\n[{}] newflow: {}".format(
-                            Flow.newest_overall_frame_time,
-                            flowid))
                     self.__flows[flowid] = Flow(self.__frame)
             except KeyError:
                 pass
@@ -261,7 +257,7 @@ if ( __name__ == '__main__'):
             log_socket.connect(logstash_socket)
         except:
             if args.debug:
-                print("Retry connecting to: {}".format(logstash_socket))
+                print("retry connecting, to: {}".format(logstash_socket))
             time.sleep(10)
             continue
         break
