@@ -211,15 +211,15 @@ class PdmlHandler(xml.sax.ContentHandler):
 
     # Call when an elements ends
     def endElement(self, tag):
-        # clean up expired flows
-        if args.debug:
-            for (flowid, flow) in self.__flows.items():
-                if not flow.not_expired():
-                    print("[{}] flow expired, flowid: {}".format(
-                        Flow.newest_overall_frame_time,
-                        flowid))
-        self.__flows = { flowid: flow for (flowid, flow) in self.__flows.items() if flow.not_expired() }
         if tag == 'packet':
+            # clean up expired flows
+            if args.debug:
+                for (flowid, flow) in self.__flows.items():
+                    if not flow.not_expired():
+                        print("[{}] flow expired, flowid: {}".format(
+                            Flow.newest_overall_frame_time,
+                            flowid))
+            self.__flows = { flowid: flow for (flowid, flow) in self.__flows.items() if flow.not_expired() }
             try:
                 flowid = self.__frame['eth']['dst']['raw']
                 if args.debug:
