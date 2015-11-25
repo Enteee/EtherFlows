@@ -14,7 +14,7 @@ import pytz
 
 DATA_MAXLEN = 200
 DATA_TOO_LONG = 'Data too long'
-FLOW_BUFFER_TIME = 0.5
+FLOW_BUFFER_TIME = 3
 STANDALONE = False
 DEBUG = True
 HOSTNAME=socket.gethostname()
@@ -90,14 +90,13 @@ class Flow():
         self.__send_ack()
 
     def add_frame(self, frame):
-        # check if packet expands flow length
-        self.__first_frame_time = min(self.__first_frame_time, capture_timestamp)
-        self.__newest_frame_time = max(self.__newest_frame_time, capture_timestamp)
-        Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, capture_timestamp)
-        # get intermediate
+        # get times
         capture_timestamp = datetime.datetime.fromtimestamp(frame['frame']['time_epoch']['raw'], TIMEZONE)
         processed_timestamp = datetime.datetime.now(TIMEZONE)
         delay = processed_timestamp - capture_timestamp
+        self.__first_frame_time = min(self.__first_frame_time, capture_timestamp)
+        self.__newest_frame_time = max(self.__newest_frame_time, capture_timestamp)
+        Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, capture_timestamp)
         flow_length = self.__newest_frame_time - self.__first_frame_time
         # set environment information to packet
         frame['@timestamp'] = capture_timestamp.isoformat()
@@ -109,7 +108,7 @@ class Flow():
         if not args.standalone:
             frame['env']['flowgen'] = self.__flowgen
         if args.debug:
-            print('[{}] add_frame, flow:{}, length: {} seconds, flushed:{}'.format(
+            print('[{}] add frame, flow: {}, length: {} seconds, flushed:{}'.format(
                 Flow.newest_overall_frame_time,
                 self.__flowid_mac,
                 flow_length,
@@ -121,7 +120,7 @@ class Flow():
             self.__frames.append(frame)
             if flow_length >= datetime.timedelta(seconds=args.flow_buffer_time):
                 if args.debug:
-                    print("[{}] flusing flow, flowid: {}".format(
+                    print("[{}] flushing flow, flowid: {}".format(
                         Flow.newest_overall_frame_time,
                         self.__flowid_mac))
                 self.flush()
@@ -131,10 +130,10 @@ class Flow():
             (Flow.newest_overall_frame_time - datetime.timedelta(seconds=args.flow_buffer_time))
 
     def flush(self):
-        for p in self.__frames:
-            self._write_frame(p)
+        for frame in self.__frames:
+            self._write_frame(frame)
         self.__frames = []
-        self.__flused = True
+        self.__flushed = True
 
     def __send_ack(self):
         if not args.standalone:
@@ -147,8 +146,8 @@ class Flow():
 
     def _write_frame(self, frame):
         try:
-            json_string = '{}\n'.format(json.dumps(frame))
-            log_socket.send(json_string.encode('utf-8'))
+            log_socket.send(json.dumps(frame).encode('utf-8'))
+            log_socket.send(b'\n')
         except Exception as e:
             print("ERROR: Could not send json object")
             log_socket.close()
