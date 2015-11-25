@@ -14,9 +14,9 @@ import pytz
 
 DATA_MAXLEN = 200
 DATA_TOO_LONG = 'Data too long'
-FLOW_BUFFER_TIME = 3
+FLOW_BUFFER_TIME = 0.5
 STANDALONE = False
-DEBUG = False
+DEBUG = True
 HOSTNAME=socket.gethostname()
 KIBANA_NOT_SUPPORTED_CHARS = '_'
 LOGSTASH_CONNECT_PORT = '5000'
@@ -118,6 +118,10 @@ class Flow():
             # Buffer packet
             self.__frames.append(frame)
             if flow_length >= datetime.timedelta(seconds=args.flow_buffer_time):
+                if args.debug:
+                    print("[{}] flusing: {}".format(
+                        Flow.newest_overall_frame_time,
+                        self.__flowid_mac))
                 self.flush()
 
     def not_expired(self):
@@ -132,11 +136,11 @@ class Flow():
 
     def __send_ack(self):
         if not args.standalone:
-            ack_frame = self.__flowgen_mac.replace(':','').decode('hex') # dst MAC
-            ack_frame += self.__flowid_mac.replace(':','').decode('hex') # src MAC
-            ack_frame += '\x09\x00' # ethertype 
-            ack_frame += 'ENTE' # payload
-            ack_frame += '\x63\x07\x3d\x02' # checksum
+            ack_frame = bytes.fromhex(self.__flowgen_mac.replace(':','')) # dst MAC
+            ack_frame += bytes.fromhex(self.__flowid_mac.replace(':','')) # src MAC
+            ack_frame += b'\x09\x00' # ethertype 
+            ack_frame += b'ENTE' # payload
+            ack_frame += b'\x63\x07\x3d\x02' # checksum
             raw_socket.send(ack_frame)
 
     def _write_frame(self, frame):
@@ -186,6 +190,12 @@ class PdmlHandler(xml.sax.ContentHandler):
                 if len(name) > 0:
                     # Build object tree
                     name_access = functools.reduce(lambda x,y: x[y], [self.__frame] + name.split('.'))
+                    if(not isinstance(name_access, dict)):
+                        if(args.debug):
+                            print("[{}] name not a dict: {}".format(
+                                Flow.newest_overall_frame_time,
+                                name))
+                        return;
                     # Extract raw data
                     if 'show' in attributes:
                         show = attributes.getValue('show')
@@ -221,11 +231,11 @@ class PdmlHandler(xml.sax.ContentHandler):
                             flowid))
                 except KeyError:
                     # flow unknown add new flow
-                    self.__flows[flowid] = Flow(self.__frame)
                     if args.debug:
                         print("\n[{}] newflow: {}".format(
                             Flow.newest_overall_frame_time,
                             flowid))
+                    self.__flows[flowid] = Flow(self.__frame)
             except KeyError:
                 pass
 
