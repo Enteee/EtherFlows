@@ -90,10 +90,16 @@ class Flow():
         self.__send_ack()
 
     def add_frame(self, frame):
+        # check if packet expands flow length
+        self.__first_frame_time = min(self.__first_frame_time, capture_timestamp)
+        self.__newest_frame_time = max(self.__newest_frame_time, capture_timestamp)
+        Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, capture_timestamp)
+        # get intermediate
         capture_timestamp = datetime.datetime.fromtimestamp(frame['frame']['time_epoch']['raw'], TIMEZONE)
         processed_timestamp = datetime.datetime.now(TIMEZONE)
         delay = processed_timestamp - capture_timestamp
         flow_length = self.__newest_frame_time - self.__first_frame_time
+        # set environment information to packet
         frame['@timestamp'] = capture_timestamp.isoformat()
         frame['env']['flowid']['raw'] = self.__flowid_mac
         frame['env']['hostname']['raw'] = HOSTNAME
@@ -102,10 +108,6 @@ class Flow():
         frame['env']['delay']['raw'] = delay.seconds + delay.microseconds * (10 ** -9)
         if not args.standalone:
             frame['env']['flowgen'] = self.__flowgen
-        # check if packet expands flow length
-        self.__first_frame_time = min(self.__first_frame_time, capture_timestamp)
-        self.__newest_frame_time = max(self.__newest_frame_time, capture_timestamp)
-        Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, capture_timestamp)
         if args.debug:
             print('[{}] add_frame, flow:{}, length: {} seconds, flushed:{}'.format(
                 Flow.newest_overall_frame_time,
