@@ -14,7 +14,7 @@ import pytz
 
 DATA_MAXLEN = 200
 DATA_TOO_LONG = 'Data too long'
-FLOW_BUFFER_TIME = 3
+FLOW_BUFFER_TIME = 0.5
 STANDALONE = False
 DEBUG = True
 HOSTNAME=socket.gethostname()

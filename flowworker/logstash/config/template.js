@@ -9,12 +9,12 @@
         "_default_": {
             "_all": { "enabled": true },
             "properties": {
-                "env" {
+                "env": {
                     "properties": {
                         "delay": {
                             "properties": {
                                 "raw": {
-                                    "type" : "double"
+                                    "type": "double"
                                 }
                             }
                         }
