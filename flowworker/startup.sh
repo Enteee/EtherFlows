@@ -1,59 +1,86 @@
 #!/usr/bin/env bash
-CLUSTER_INTERFACE=""
-CLUSTER_INTERFACE_GIVEN=false
-INTERFACE_GIVEN=false
-IGNORED_INTERFACES="lo"
-INSTANCE_DIR="./instances"
 WORK_DIR="$(pwd)"
-STOP=false
+FLOWGEN_ID="0xBADA5500"
 AUTOMATIC=false
 STANDALONE=false
-STANDALONE_FILE="sys/standalone"
+SNIFFING_INTERFACE=""
+PCAP_FILE=""
+
+ES_GOSSIP_IP="127.0.0.1"
+ES_PUBLISH_HOST="127.0.0.1"
+ES_HEAP_SIZE="4g"
 
 UNAME=$(uname -s)
-PUBLIC_NETWORK_IDENTIFIER='config\.vm\.network "public_network"'
+ELK_STACK=true
+
+RUNNING=true
 
 function usage {
     cat << EOF
-    usage: ${0} -c interface [OPTIONS]
+    usage: ${0} <INPUT> [OPTIONS]
+    INPUT: 
+        -i interface    :   Sniffing interface
+        -r file         :   Pcap file
+
     OPTIONS:
-        -c interface    :   Cluster interface (mandatory, not repeated)
-        -i interface    :   Sniffing interfaces (repeated)
-        -d instance dir :   Instance directory
-        -w workdir      :   Set the workdir (must contain Vagrantfile)
+        -g gossip ip    :   IP of an ES instance which acts as a gossip router for the cluster
+        -p publis ip    :   IP which should be published in the ES cluster
+        -H heap size    :   Elasticsearch maximum heap size
         -a              :   Automatic provisioning
+        -s              :   Starts the flowworker without a ELK environment
+        -S              :   Starts the script in standalone (no flowgen) mode
         -h              :   Print this help
-        -s              :   Stops all the VMs
-        -S              :   Start all the VMs in standalone mode
 EOF
 }
 
-function enter {
+function enter() {
     if ! ${AUTOMATIC}; then
         echo "[ENTER]"
         read
     fi
 }
 
+function pcap_filter() {
+    # Write pcap-filter
+    if ${STANDALONE}; then
+        # Standalone filter ES/Logstash/Kibana traffic
+        echo "(port not 9200 and port not 9300 and port not 5000 and port not 5601)"
+    else
+        # Flowgen: only accept traffic from flowgen
+        echo "(ether [6:4] & 0xffffff00 = ${FLOWGEN_ID})"
+    fi
+}
 
-if [ ${UNAME} == "Darwin" ]; then 
-    echo "OS X is currently not supported"
-    exit 1
-fi
+function flowworker_args() {
+    # Write pcap-filter
+    if ${STANDALONE}; then
+        # Standalone: run in standalone mode
+        echo "-S -t0"
+    fi
+}
+
+trap sigint SIGINT
+function sigint(){
+    RUNNING=false
+}
 
 #Options options
-while getopts "c:i:d:w:asSh" opt; do
+while getopts "i:r:g:p:H:asSh" opt; do
     case $opt in
-    c)
-        CLUSTER_INTERFACE="${OPTARG}"
-        CLUSTER_INTERFACE_GIVEN=true
-    ;;
     i)
-        INTERFACES="${INTERFACES} ${OPTARG}"
-        INTERFACE_GIVEN=true
+        SNIFFING_INTERFACE="${OPTARG}"
     ;;
-    d)
-        INSTANCE_DIR="${OPTARG}"
+    r)
+        PCAP_FILE="${OPTARG}"
+    ;;
+    g)
+        ES_GOSSIP_IP="${OPTARG}"
+    ;;
+    p)
+        ES_PUBLISH_HOST="${OPTARG}"
+    ;;
+    H)
+        ES_HEAP_SIZE="${OPTARG}"
     ;;
     w)
         WORK_DIR="${OPTARG}"
@@ -62,14 +89,14 @@ while getopts "c:i:d:w:asSh" opt; do
         AUTOMATIC=true
     ;;
     s)
-        STOP=true
+        ELK_STACK=false
+    ;;
+    S)
+        STANDALONE=true
     ;;
     h)
         usage
         exit 0;
-    ;;
-    S)
-        STANDALONE=true
     ;;
     \?)
         echo "Invalid option: -${OPTARG}"
@@ -80,53 +107,60 @@ while getopts "c:i:d:w:asSh" opt; do
 done
 shift $(expr $OPTIND - 1 )
 
-if ! ${CLUSTER_INTERFACE_GIVEN}; then
-    echo "No cluster interface given"
+if [ -z "${PCAP_FILE}" ] && [ -z "${SNIFFING_INTERFACE}" ]; then 
+    echo "Ether '-i' or '-r' option is required"
+    usage
+    exit 1
+elif [ -n "${PCAP_FILE}" ] && [ -n "${SNIFFING_INTERFACE}" ]; then 
+    echo ${PCAP_FILE} ${SNIFFING_INTERFACE}
+    echo "'-i' abd '-r' options can only be used exclusively"
     usage
     exit 1
 fi
 
-if [ ! -e "${WORK_DIR}/Vagrantfile" ];then
+if [ -n "${SNIFFING_INTERFACE}" ]; then
+    if ! ip link show "${SNIFFING_INTERFACE}" &>/dev/null; then
+        echo "Invalid sniffing interface: ${SNIFFING_INTERFACE}"
+        usage
+        exit 1
+    fi
+else 
+    if [ ! -f ${PCAP_FILE} ]; then
+        echo "Pcap file not found"
+        usage
+        exit 1
+    fi
+fi
+
+if  [ ! -e "${WORK_DIR}/docker-compose.yml" ] && 
+    [ ! -e "${WORK_DIR}/flowworker.py" ] ;then
     echo "Invalid work dir: ${WORK_DIR}"
     usage
     exit 1
 fi
 
-if ! ${INTERFACE_GIVEN} ; then
-    INTERFACES=$(ip link show | \
-        sed -nre 's/^[0-9]+: (.+?): .*/\1/p' | \
-        grep -v "${IGNORED_INTERFACES}")
+#to the work dir
+cd "${WORK_DIR}"
+
+# start docker if needed
+if ${ELK_STACK}; then
+    (
+    export ES_ZEN_UNICAST_HOST="${ES_GOSSIP_IP}" && \
+    export ES_PUBLISH_HOST="${ES_PUBLISH_HOST}"  && \
+    export ES_HEAP_SIZE="${ES_HEAP_SIZE}"  && \
+    sudo -E docker-compose up 
+    ) &
 fi
 
-cat << EOF
-Cluster interface:
-${CLUSTER_INTERFACE}
-Sniffing interfaces:
-${INTERFACES}
-EOF
-enter
+if [ -n "${SNIFFING_INTERFACE}" ]; then 
+    while ${RUNNING}; do 
+        sudo sh -c "
+            tshark -i '${SNIFFING_INTERFACE}' -q -lT pdml '$(pcap_filter)' 2>/dev/null | \
+            ${WORK_DIR}/flowworker.py -i '${SNIFFING_INTERFACE}' $(flowworker_args)
+        "
+    done 
+else 
+    tshark -r "${PCAP_FILE}" -q -lT pdml 2>/dev/null | \
+    ${WORK_DIR}/flowworker.py -i "${PCAP_FILE}" $(flowworker_args)
+fi
 
-for i in ${INTERFACES}; do
-    instance="${INSTANCE_DIR}/${i}"
-    interface=$(tr -d " " <<< ${i})
-    hostname="$(hostname -s).${interface}"
-
-    export VAGRANT_CLUSTER_INTERFACE="${CLUSTER_INTERFACE}"
-    export VAGRANT_SNIFF_INTERFACE="${interface}"
-    export VAGRANT_HOSTNAME="${hostname}"
-
-    mkdir -p "${instance}"
-    ( cd "${instance}" && vagrant destroy -f)
-    rm -rf "${instance}"
-    if ! ${STOP}; then
-        # create directory structure
-        cd "${WORK_DIR}"
-        find . -path "${INSTANCE_DIR}" -prune -o -type d -exec mkdir -p "${instance}/{}" \;
-        find . -path "${INSTANCE_DIR}" -prune -o -type f -exec ln "${WORK_DIR}/{}" "${instance}/{}" \;
-        cd "${instance}"
-        if ${STANDALONE}; then
-            touch "${STANDALONE_FILE}"
-        fi
-        vagrant up
-    fi
-done

@@ -1,0 +1,34 @@
+elasticsearch:
+    container_name: elasticsearch
+    build: elasticsearch/
+    command: elasticsearch
+    volumes:
+        - ./elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+    ports:
+        - "9200:9200"
+        - "9300:9300"
+    environment:
+        - ES_ZEN_UNICAST_HOST
+        - ES_PUBLISH_HOST
+        - ES_HEAP_SIZE
+
+logstash:
+    container_name: logstash
+    build: logstash/
+    command: logstash -f /etc/logstash/conf.d/logstash.conf
+    volumes:
+        - ./logstash/config:/etc/logstash/conf.d
+    ports:
+        - "5000:5000"
+    links:
+        - elasticsearch
+
+kibana:
+    container_name: kibana
+    build: kibana/
+    volumes:
+        - ./kibana/config/kibana.yml:/opt/kibana/config/kibana.yml
+    ports:
+        - "5601:5601"
+    links:
+        - elasticsearch
