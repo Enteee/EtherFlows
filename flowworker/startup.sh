@@ -4,6 +4,7 @@ FLOWGEN_ID="0xBADA5500"
 AUTOMATIC=false
 STANDALONE=false
 SNIFFING_INTERFACE=""
+PCAP_FILE=""
 
 ES_GOSSIP_IP="127.0.0.1"
 ES_PUBLISH_HOST="127.0.0.1"
@@ -16,9 +17,12 @@ RUNNING=true
 
 function usage {
     cat << EOF
-    usage: ${0} -i interface [OPTIONS]
-    OPTIONS:
+    usage: ${0} <INPUT> [OPTIONS]
+    INPUT: 
         -i interface    :   Sniffing interface
+        -r file         :   Pcap file
+
+    OPTIONS:
         -g gossip ip    :   IP of an ES instance which acts as a gossip router for the cluster
         -p publis ip    :   IP which should be published in the ES cluster
         -H heap size    :   Elasticsearch maximum heap size
@@ -61,10 +65,13 @@ function sigint(){
 }
 
 #Options options
-while getopts "i:g:p:H:asSh" opt; do
+while getopts "i:r:g:p:H:asSh" opt; do
     case $opt in
     i)
         SNIFFING_INTERFACE="${OPTARG}"
+    ;;
+    r)
+        PCAP_FILE="${OPTARG}"
     ;;
     g)
         ES_GOSSIP_IP="${OPTARG}"
@@ -100,10 +107,29 @@ while getopts "i:g:p:H:asSh" opt; do
 done
 shift $(expr $OPTIND - 1 )
 
-if ! ip link show "${SNIFFING_INTERFACE}" &>/dev/null; then
-    echo "Invalid sniffing interface: ${SNIFFING_INTERFACE}"
+if [ -z "${PCAP_FILE}" ] && [ -z "${SNIFFING_INTERFACE}" ]; then 
+    echo "Ether '-i' or '-r' option is required"
     usage
     exit 1
+elif [ -n "${PCAP_FILE}" ] && [ -n "${SNIFFING_INTERFACE}" ]; then 
+    echo ${PCAP_FILE} ${SNIFFING_INTERFACE}
+    echo "'-i' abd '-r' options can only be used exclusively"
+    usage
+    exit 1
+fi
+
+if [ -n "${SNIFFING_INTERFACE}" ]; then
+    if ! ip link show "${SNIFFING_INTERFACE}" &>/dev/null; then
+        echo "Invalid sniffing interface: ${SNIFFING_INTERFACE}"
+        usage
+        exit 1
+    fi
+else 
+    if [ ! -f ${PCAP_FILE} ]; then
+        echo "Pcap file not found"
+        usage
+        exit 1
+    fi
 fi
 
 if  [ ! -e "${WORK_DIR}/docker-compose.yml" ] && 
@@ -126,10 +152,15 @@ if ${ELK_STACK}; then
     ) &
 fi
 
-while ${RUNNING}; do 
-    sudo sh -c "
-        tshark -i '${SNIFFING_INTERFACE}' -q -lT pdml '$(pcap_filter)' 2>/dev/null | \
-        ${WORK_DIR}/flowworker.py -i '${SNIFFING_INTERFACE}' $(flowworker_args)
-    "
-done
+if [ -n "${SNIFFING_INTERFACE}" ]; then 
+    while ${RUNNING}; do 
+        sudo sh -c "
+            tshark -i '${SNIFFING_INTERFACE}' -q -lT pdml '$(pcap_filter)' 2>/dev/null | \
+            ${WORK_DIR}/flowworker.py -i '${SNIFFING_INTERFACE}' $(flowworker_args)
+        "
+    done 
+else 
+    tshark -r "${PCAP_FILE}" -q -lT pdml 2>/dev/null | \
+    ${WORK_DIR}/flowworker.py -i "${PCAP_FILE}" $(flowworker_args)
+fi
 
