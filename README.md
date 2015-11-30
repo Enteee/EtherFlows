@@ -17,7 +17,7 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
   * [arch linux](https://www.archlinux.org/)
 
     ```sh
-    $ pacman --noconfirm -S docker-compose
+    $ pacman --noconfirm -S docker-compose python-pytz
     ```
 
   * apt-based, e.g: debian, ubuntu, ...
@@ -57,13 +57,15 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 * [dpdk >= 2.1.0][dpdk]
 
 ### Flow Worker
-* [python2][python2]
+* [python3][python3]
+ * [python-pytz][python-pytz]
 
 [flowgen]:flowgen/flowgen.c
 [flowworker]:flowworker/flowworker.py
 
 [dpdk]:http://dpdk.org/
-[python2]:https://www.python.org/download/releases/2.7.3/
+[python3]:https://www.python.org
+[python-pytz]:http://pytz.sourceforge.net/
 [docker-compose]:https://docs.docker.com/compose/
 [docker]:https://www.docker.com/
 [irc]:http://webchat.freenode.net/?nick=newEtherFlowsUser&channels=EtherFlows
