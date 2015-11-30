@@ -65,7 +65,7 @@ parser.add_argument('-L',
 parser.add_argument('-m',
                     default=MAX_DELAY,
                     dest='max_delay',
-                    help='Maximum delay this flow worker can handle. If the packet delay gets bigger than this value the flow worker will not accept new flows anymore. [default {}]'.format(MAX_DELAY)
+                    help='Maximum delay this flow worker can handle in seconds. If the packet delay gets bigger than this value the flow worker will not accept new flows anymore. [default {}]'.format(MAX_DELAY)
                     )
 
 class AutoVivification(dict):
@@ -85,7 +85,7 @@ class Flow():
     """ The overall packet time """
     newest_overall_frame_time = datetime.datetime(datetime.MINYEAR, 1, 1, tzinfo = TIMEZONE)
     """ The delay of the last packet """
-    delay = datetime.datetime(datetime.MINYEAR, 1, 1, tzinfo = TIMEZONE)
+    delay = datetime.timedelta()
 
     def __init__(self, first_frame):
         self.__frames = []
@@ -144,13 +144,19 @@ class Flow():
         self.__flushed = True
 
     def __send_ack(self):
-        if not args.standalone:
+        if not args.standalone \
+            and Flow.delay.seconds < args.max_delay:
+            # send response packet
             ack_frame = bytes.fromhex(self.__flowgen_mac.replace(':','')) # dst MAC
             ack_frame += bytes.fromhex(self.__flowid_mac.replace(':','')) # src MAC
             ack_frame += b'\x09\x00' # ethertype 
             ack_frame += b'ENTE' # payload
             ack_frame += b'\x63\x07\x3d\x02' # checksum
             raw_socket.send(ack_frame)
+        else:
+            print("[{}] flow rejected delay too big, Flow.delay: {}".format(
+                Flow.newest_overall_frame_time,
+                Flow.delay))
 
     def _write_frame(self, frame):
         try:
@@ -239,11 +245,8 @@ class PdmlHandler(xml.sax.ContentHandler):
                     flow = self.__flows[flowid]
                     self.__flows[flowid].add_frame(self.__frame)
                 except KeyError:
-                    if Flow.delay < args.max_delay:
-                        # flow unknown add new flow
-                        self.__flows[flowid] = Flow(self.__frame)
-                    else:
-                        print("[{}] flow rejected delay too big, Flow.delay: {}".format(Flow.delay))
+                    # flow unknown add new flow
+                    self.__flows[flowid] = Flow(self.__frame)
             except KeyError:
                 pass
 
