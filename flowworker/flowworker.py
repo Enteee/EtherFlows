@@ -14,13 +14,14 @@ import pytz
 
 DATA_MAXLEN = 200
 DATA_TOO_LONG = 'Data too long'
-FLOW_BUFFER_TIME = 0
+FLOW_BUFFER_TIME = 3
 STANDALONE = False
 DEBUG = False
 HOSTNAME=socket.gethostname()
 KIBANA_NOT_SUPPORTED_CHARS = '_'
 LOGSTASH_CONNECT_PORT = '5000'
 LOGSTASH_CONNECT = '127.0.0.1:{}'.format(LOGSTASH_CONNECT_PORT)
+MAX_DELAY = 2
 TIMEZONE = pytz.timezone(time.tzname[0])
 
 
@@ -61,6 +62,11 @@ parser.add_argument('-L',
                     dest='logstash_connect',
                     help='Logstash receiver in the format HOSTNAME[:PORT] [default: {}]'.format(LOGSTASH_CONNECT)
                     )
+parser.add_argument('-m',
+                    default=MAX_DELAY,
+                    dest='max_delay',
+                    help='Maximum delay this flow worker can handle. If the packet delay gets bigger than this value the flow worker will not accept new flows anymore. [default {}]'.format(MAX_DELAY)
+                    )
 
 class AutoVivification(dict):
     """
@@ -78,6 +84,8 @@ class Flow():
 
     """ The overall packet time """
     newest_overall_frame_time = datetime.datetime(datetime.MINYEAR, 1, 1, tzinfo = TIMEZONE)
+    """ The delay of the last packet """
+    delay = datetime.datetime(datetime.MINYEAR, 1, 1, tzinfo = TIMEZONE)
 
     def __init__(self, first_frame):
         self.__frames = []
@@ -93,7 +101,7 @@ class Flow():
         # get times
         capture_timestamp = datetime.datetime.fromtimestamp(frame['frame']['time_epoch']['raw'], TIMEZONE)
         processed_timestamp = datetime.datetime.now(TIMEZONE)
-        delay = processed_timestamp - capture_timestamp
+        Flow.delay = processed_timestamp - capture_timestamp
         self.__first_frame_time = min(self.__first_frame_time, capture_timestamp)
         self.__newest_frame_time = max(self.__newest_frame_time, capture_timestamp)
         Flow.newest_overall_frame_time = max(Flow.newest_overall_frame_time, capture_timestamp)
@@ -104,7 +112,7 @@ class Flow():
         frame['env']['hostname']['raw'] = HOSTNAME
         frame['env']['interface']['raw'] = args.interface
         frame['env']['processed']['raw'] = processed_timestamp.isoformat()
-        frame['env']['delay']['raw'] = delay.seconds + delay.microseconds * (10 ** -9)
+        frame['env']['delay']['raw'] = Flow.delay.seconds + Flow.delay.microseconds * (10 ** -9)
         if not args.standalone:
             frame['env']['flowgen'] = self.__flowgen
         if args.debug:
@@ -231,8 +239,11 @@ class PdmlHandler(xml.sax.ContentHandler):
                     flow = self.__flows[flowid]
                     self.__flows[flowid].add_frame(self.__frame)
                 except KeyError:
-                    # flow unknown add new flow
-                    self.__flows[flowid] = Flow(self.__frame)
+                    if Flow.delay < args.max_delay:
+                        # flow unknown add new flow
+                        self.__flows[flowid] = Flow(self.__frame)
+                    else:
+                        print("[{}] flow rejected delay too big, Flow.delay: {}".format(Flow.delay))
             except KeyError:
                 pass
 
