@@ -15,13 +15,13 @@ import pytz
 DATA_MAXLEN = 200
 DATA_TOO_LONG = 'Data too long'
 FLOW_BUFFER_TIME = 3
+MAX_DELAY = 2
 STANDALONE = False
 DEBUG = False
 HOSTNAME=socket.gethostname()
 KIBANA_NOT_SUPPORTED_CHARS = '_'
 LOGSTASH_CONNECT_PORT = '5000'
 LOGSTASH_CONNECT = '127.0.0.1:{}'.format(LOGSTASH_CONNECT_PORT)
-MAX_DELAY = 2
 TIMEZONE = pytz.timezone(time.tzname[0])
 
 
@@ -150,9 +150,10 @@ class Flow():
         Flow.count_flushed += 1
 
     def __send_ack(self):
+        flow_delay = Flow.delay.seconds + Flow.delay.microseconds * (10 ** -9)
+        max_delay = args.max_delay / max(1, Flow.count_flushed)
         if not args.standalone \
-            and  Flow.delay.seconds + Flow.delay.microseconds * (10 ** -9) < \
-                 args.max_delay / max(1, Flows.count_flushed):
+            and flow_delay < max_delay:
             # send response packet
             ack_frame = bytes.fromhex(self.__flowgen_mac.replace(':','')) # dst MAC
             ack_frame += bytes.fromhex(self.__flowid_mac.replace(':','')) # src MAC
@@ -161,16 +162,19 @@ class Flow():
             ack_frame += b'\x63\x07\x3d\x02' # checksum
             raw_socket.send(ack_frame)
         else:
-            print("[{}] flow rejected delay too big, Flow.delay: {}".format(
+            print("[{}] flow rejected, flow_delay: {} < max_delay: {}".format(
                 Flow.newest_overall_frame_time,
-                Flow.delay))
+                flow_delay,
+                max_delay))
 
     def _write_frame(self, frame):
         try:
             log_socket.send(json.dumps(frame).encode('utf-8'))
             log_socket.send(b'\n')
         except Exception as e:
-            print("ERROR: Could not send json object")
+            print("[{}] ERROR: Could not send json object".format(
+                Flow.newest_overall_frame_time
+            ))
             log_socket.close()
             sys.exit(1)
         self.__send_ack()
@@ -268,6 +272,13 @@ class PdmlHandler(xml.sax.ContentHandler):
 
 if ( __name__ == '__main__'):
     args = parser.parse_args()
+    # Validate arguments
+    if args.max_delay >= args.flow_buffer_time:
+        print("[{}] ERROR: invalid arguments, max_delay {} >= flow_buffer_time: {}".format(
+                Flow.newest_overall_frame_time,
+                args.max_delay,
+                args.flow_buffer_time))
+        sys.exit(1)
     # bind raw socket
     if not args.standalone:
         raw_socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
