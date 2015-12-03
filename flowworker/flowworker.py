@@ -115,6 +115,7 @@ class Flow():
         frame['env']['interface']['raw'] = args.interface
         frame['env']['processed']['raw'] = processed_timestamp.isoformat()
         frame['env']['delay']['raw'] = Flow.delay.seconds + Flow.delay.microseconds * (10 ** -9)
+        frame['env']['max_delay']['raw'] = args.max_delay / max(1, Flow.count_flushed)
         if not args.standalone:
             frame['env']['flowgen'] = self.__flowgen
         if args.debug:
