@@ -161,8 +161,8 @@ class Flow():
             ack_frame += b'ENTE' # payload
             ack_frame += b'\x63\x07\x3d\x02' # checksum
             raw_socket.send(ack_frame)
-        else:
-            print("[{}] flow rejected, flow_delay: {} < max_delay: {}".format(
+        elif args.debug:
+            print("[{}] flow rejected, flow_delay: {} >= max_delay: {}".format(
                 Flow.newest_overall_frame_time,
                 flow_delay,
                 max_delay))
