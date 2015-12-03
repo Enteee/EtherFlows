@@ -145,7 +145,7 @@ class Flow():
 
     def __send_ack(self):
         if not args.standalone \
-            and Flow.delay.seconds < args.max_delay:
+            and  Flow.delay.seconds + Flow.delay.microseconds * (10 ** -9) < args.max_delay:
             # send response packet
             ack_frame = bytes.fromhex(self.__flowgen_mac.replace(':','')) # dst MAC
             ack_frame += bytes.fromhex(self.__flowid_mac.replace(':','')) # src MAC
