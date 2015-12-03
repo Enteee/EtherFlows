@@ -86,6 +86,8 @@ class Flow():
     newest_overall_frame_time = datetime.datetime(datetime.MINYEAR, 1, 1, tzinfo = TIMEZONE)
     """ The delay of the last packet """
     delay = datetime.timedelta()
+    """ Flushed flows count """
+    count_flushed = 0
 
     def __init__(self, first_frame):
         self.__frames = []
@@ -137,15 +139,20 @@ class Flow():
         return self.__newest_frame_time > \
             (Flow.newest_overall_frame_time - datetime.timedelta(seconds=args.flow_buffer_time))
 
+    def flushed(self):
+        return self.__flushed
+
     def flush(self):
         for frame in self.__frames:
             self._write_frame(frame)
         self.__frames = []
         self.__flushed = True
+        Flow.count_flushed += 1
 
     def __send_ack(self):
         if not args.standalone \
-            and  Flow.delay.seconds + Flow.delay.microseconds * (10 ** -9) < args.max_delay:
+            and  Flow.delay.seconds + Flow.delay.microseconds * (10 ** -9) < \
+                 args.max_delay / max(1, Flows.count_flushed):
             # send response packet
             ack_frame = bytes.fromhex(self.__flowgen_mac.replace(':','')) # dst MAC
             ack_frame += bytes.fromhex(self.__flowid_mac.replace(':','')) # src MAC
@@ -227,14 +234,19 @@ class PdmlHandler(xml.sax.ContentHandler):
     # Call when an elements ends
     def endElement(self, tag):
         if tag == 'packet':
+            not_expired_flows = {}
             # clean up expired flows
-            if args.debug:
-                for (flowid, flow) in self.__flows.items():
-                    if not flow.not_expired():
+            for (flowid, flow) in self.__flows.items():
+                if flow.not_expired():
+                    not_expired_flows[flowid] = flow
+                else:
+                    if flow.flushed():
+                       Flow.count_flushed -= 1
+                    if args.debug:
                         print("[{}] flow expired, flowid: {}".format(
                             Flow.newest_overall_frame_time,
                             flowid))
-            self.__flows = { flowid: flow for (flowid, flow) in self.__flows.items() if flow.not_expired() }
+            self.__flows = not_expired_flows
             try:
                 flowid = self.__frame['eth']['dst']['raw']
                 if args.debug:
