@@ -182,8 +182,8 @@ class Worker():
     def send_keep_alive(self):
         while(running):
             if not args.standalone:
-                flow_delay = Worker.delay.seconds\
-                           + Worker.delay.microseconds * (10 ** -9)
+                flow_delay = Worker.delay.seconds * (10 ** 6)\
+                           + Worker.delay.microseconds
                 # send keep alive frame
                 ka_frame = bytes.fromhex(args.broadcast_mac.replace(':','')) # dst MAC
                 ka_frame += bytes.fromhex(Worker.mac.replace(':','')) # src MAC
