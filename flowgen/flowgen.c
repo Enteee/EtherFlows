@@ -39,6 +39,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <arpa/inet.h> 
+#include <sys/queue.h>
 
 #include <rte_eal.h>
 #include <rte_ethdev.h>
