@@ -222,13 +222,12 @@ lcore_keepalive(__attribute__((unused)) void *arg)
             struct ether_hdr* ether_header = rte_pktmbuf_mtod(keepalive_buf, struct ether_hdr *);
             struct ether_addr* addr = &(ether_header->s_addr);
             // get delay in BIG endian (network byte order)
-            uint32_t delay__ms = ntohl(
-                                        rte_pktmbuf_mtod_offset(
-                                                                keepalive_buf,
-                                                                uint32_t,
-                                                                sizeof(struct ether_hdr)
-                                        )
-                                    );
+            uint32_t* delay_ptr__ms = rte_pktmbuf_mtod_offset(
+                                                            keepalive_buf,
+                                                            uint32_t *,
+                                                            sizeof(struct ether_hdr)
+                                        );
+            uint32_t delay__ms = ntohl(*delay_ptr__ms);
             // TODO: faster lookup
             // check if addr exists in keepalive table
             entry = SLIST_FIRST(&(keepalives.list));
