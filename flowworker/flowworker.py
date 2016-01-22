@@ -157,12 +157,14 @@ class Worker():
         capture_timestamp = datetime.datetime.fromtimestamp(frame['frame']['time_epoch']['raw'], TIMEZONE)
         processed_timestamp = datetime.datetime.now(TIMEZONE)
         Worker.delay = processed_timestamp - capture_timestamp
+        if args.debug:
+            print("Frame delay: {}".format(Worker.delay))
         # Set environment information to packet
         frame['@timestamp'] = capture_timestamp.isoformat()
         frame['env']['hostname']['raw'] = HOSTNAME
         frame['env']['interface']['raw'] = args.interface
         frame['env']['processed']['raw'] = processed_timestamp.isoformat()
-        frame['env']['delay']['raw'] = Worker.delay.seconds + Worker.delay.microseconds * (10 ** -9)
+        frame['env']['delay']['raw'] = Worker.delay.seconds + Worker.delay.microseconds * (10 ** -6)
         if not args.standalone:
             frame['env']['flowgen'] = "0x{3}{4}{5}".format(
                     *frame['eth']['src']['raw'].split(':'))
@@ -182,13 +184,15 @@ class Worker():
 
     def send_keep_alive(self):
         while(running):
-            flow_delay = Worker.delay.seconds * (10 ** 6)\
+            worker_delay = Worker.delay.seconds * (10 ** 6)\
                        + Worker.delay.microseconds
+            if args.debug:
+                print("Worker delay: {}".format(worker_delay))
             # send keep alive frame
             ka_frame = bytes.fromhex(args.broadcast_mac.replace(':','')) # dst MAC
             ka_frame += bytes.fromhex(Worker.mac.replace(':','')) # src MAC
             ka_frame += b'\x09\x00' # ethertype 
-            ka_frame += struct.pack(">I", flow_delay) # payload
+            ka_frame += struct.pack(">I", worker_delay) # payload
             crc = binascii.crc32(ka_frame) & 0xffffffff
             ka_frame += struct.pack("I", crc) # checksum
             try:
