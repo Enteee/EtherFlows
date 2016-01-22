@@ -437,8 +437,11 @@ main(int argc, char *argv[])
 
     /* Check that there is an even number of ports to send/receive on. */
     nb_ports = rte_eth_dev_count();
-    if (nb_ports < 2 || (nb_ports & 1))
-        rte_exit(EXIT_FAILURE, "Error: number of ports must be even\n");
+    if (nb_ports != 2)
+        rte_exit(EXIT_FAILURE, "Error: only excatly two ports supported\n");
+
+    if (rte_lcore_count() != 2)
+        rte_exit(EXIT_FAILURE, "Error: need at least two lcore\n");
 
     /* Creates a new mempool in memory to hold the mbufs. */
     mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
@@ -455,6 +458,9 @@ main(int argc, char *argv[])
 
     if (rte_lcore_count() > 2)
         printf("\nWARNING: Too many lcores enabled. Only 2 used.\n");
+
+    /* call lcore_keepalive on one slave lcore*/
+    rte_eal_remote_launch(lcore_keepalive, NULL, 1);
 
     /* Call lcore_main on the master core only. */
     lcore_forward();
