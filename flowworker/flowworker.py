@@ -14,6 +14,7 @@ import pytz
 import netifaces
 import signal 
 import struct
+import binascii
 from threading import Thread
 
 DATA_MAXLEN = 200
@@ -181,18 +182,20 @@ class Worker():
 
     def send_keep_alive(self):
         while(running):
-            if not args.standalone:
-                flow_delay = Worker.delay.seconds * (10 ** 6)\
-                           + Worker.delay.microseconds
-                # send keep alive frame
-                ka_frame = bytes.fromhex(args.broadcast_mac.replace(':','')) # dst MAC
-                ka_frame += bytes.fromhex(Worker.mac.replace(':','')) # src MAC
-                ka_frame += b'\x09\x00' # ethertype 
-                ka_frame += struct.pack(">I", flow_delay) # payload
-                crc = binascii.crc32(ka_frame) & 0xffffffff
-                ka_frame += struct.pack("I", crc) # checksum
+            flow_delay = Worker.delay.seconds * (10 ** 6)\
+                       + Worker.delay.microseconds
+            # send keep alive frame
+            ka_frame = bytes.fromhex(args.broadcast_mac.replace(':','')) # dst MAC
+            ka_frame += bytes.fromhex(Worker.mac.replace(':','')) # src MAC
+            ka_frame += b'\x09\x00' # ethertype 
+            ka_frame += struct.pack(">I", flow_delay) # payload
+            crc = binascii.crc32(ka_frame) & 0xffffffff
+            ka_frame += struct.pack("I", crc) # checksum
+            try:
                 raw_socket.send(ka_frame)
-                time.sleep(1)
+            except:
+                print("error raw")
+            time.sleep(1)
 
 def SIGINT_handler(x,y):
     global running
