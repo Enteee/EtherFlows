@@ -28,7 +28,7 @@ LOGSTASH_CONNECT = '127.0.0.1:{}'.format(LOGSTASH_CONNECT_PORT)
 BROADCAST_MAC = 'FF:FF:FF:FF:FF:FF'
 TIMEZONE = pytz.timezone(time.tzname[0])
 
-# Keep alive var
+# Main thread is running
 running = True
 
 parser = argparse.ArgumentParser(description='Flowworker')
@@ -145,6 +145,7 @@ class Worker():
     """ MAC address of flowworker instance"""
     mac = "00:00:00:00:00:00"
     delay = datetime.timedelta()
+    raw_socket = None
 
     def __init__(self):
         # Get mac address of interface
@@ -152,6 +153,13 @@ class Worker():
         Worker.mac = "{}".format(
                 addrs[netifaces.AF_LINK][0]['addr']
                 )
+        # bind raw socket
+        if not args.standalone:
+            Worker.raw_socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
+            Worker.raw_socket.bind((args.interface, 0))
+            self.__keep_alive_thread = Thread(target = self.send_keep_alive)
+            self.__keep_alive_thread.start()
+
     def write_frame(self, frame):
         # Get times
         capture_timestamp = datetime.datetime.fromtimestamp(frame['frame']['time_epoch']['raw'], TIMEZONE)
@@ -179,15 +187,13 @@ class Worker():
             ))
             log_socket.close()
             sys.exit(1)
-        
-
 
     def send_keep_alive(self):
         while(running):
-            worker_delay = Worker.delay.seconds * (10 ** 6)\
-                       + Worker.delay.microseconds
+            worker_delay = Worker.delay.seconds * (10 ** 3)\
+                       + Worker.delay.microseconds // (10 ** 3)
             if args.debug:
-                print("Worker delay: {}".format(worker_delay))
+                print("Worker delay: {} ms".format(worker_delay))
             # send keep alive frame
             ka_frame = bytes.fromhex(args.broadcast_mac.replace(':','')) # dst MAC
             ka_frame += bytes.fromhex(Worker.mac.replace(':','')) # src MAC
@@ -196,7 +202,7 @@ class Worker():
             crc = binascii.crc32(ka_frame) & 0xffffffff
             ka_frame += struct.pack("I", crc) # checksum
             try:
-                raw_socket.send(ka_frame)
+                Worker.raw_socket.send(ka_frame)
             except:
                 print("error raw")
             time.sleep(1)
@@ -204,8 +210,6 @@ class Worker():
 def SIGINT_handler(x,y):
     global running
     running = False
-
-
 
 if ( __name__ == '__main__'):
     args = parser.parse_args()
@@ -238,12 +242,6 @@ if ( __name__ == '__main__'):
     parser.setContentHandler(handler)
     parser_thread = Thread(target = parser.parse, args = (sys.stdin,))
     parser_thread.start()
-    # bind raw socket
-    if not args.standalone:
-        raw_socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
-        raw_socket.bind((args.interface, 0))
-        keep_alive_thread = Thread(target = worker.send_keep_alive)
-        keep_alive_thread.start()
 
     # Set signal handlers 
     signal.signal(signal.SIGINT, SIGINT_handler)

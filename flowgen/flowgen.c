@@ -57,16 +57,16 @@
 #define BURST_SIZE 32
 
 /** Keepalive specification */
-static const double keepalive_timeout = 2.f;
+static const double keepalive_timeout__s = 2.f;
 static const uint16_t keepalive_frame_len = sizeof(struct ether_hdr) + sizeof(uint32_t);
-static const uint16_t keepalive_type = 0x9000;
-static const struct ether_addr keepalive_addr = { .addr_bytes = {0xff} };
+static const uint16_t keepalive_type = 0x0009; // Big ending for 0x0900
+static const struct ether_addr keepalive_addr = { .addr_bytes = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff} };
 
 struct keepalive_entry {
     SLIST_ENTRY(keepalive_entry) entries;   /* Singly-linked List. */
     struct ether_addr addr;                 /**< mac of worker */
     time_t ts;                              /**< timestamp of entry */
-    uint32_t delay__ms;                     /**< delay of worker in milliseconds */
+    uint32_t delay__ms;                     /**< delay of worker in microseconds */
 };
 
 struct keepalives {
@@ -80,7 +80,7 @@ static uint32_t flowgen_id;
 
 static struct keepalives keepalives = {
     .list = SLIST_HEAD_INITIALIZER(&(keepalives.list)),
-    .min_delay_worker = { { 0x0 }},
+    .min_delay_worker = { .addr_bytes =  { 0x0 , 0x0, 0x0, 0x0, 0x0, 0x0 } },
 #define LOCK_KEEPALIVE (pthread_mutex_lock(&keepalives.mutex));
 #define UNLOCK_KEEPALIVE (pthread_mutex_unlock(&keepalives.mutex));
     .mutex = PTHREAD_MUTEX_INITIALIZER,
@@ -92,14 +92,17 @@ static const char *ARG_KEYS[] = {"id"};
 
 static const struct rte_eth_conf port_conf_default = {
     .rxmode = {
-        .mq_mode = ETH_MQ_RX_RSS,
+     //   .mq_mode = ETH_MQ_RX_RSS,
         .max_rx_pkt_len = ETHER_MAX_LEN 
     },
-    .rx_adv_conf = { .rss_conf = { 
-        .rss_key = NULL,
-        .rss_hf = ETH_RSS_IP 
-    }
+    /*
+    .rx_adv_conf = { 
+            .rss_conf = { 
+            .rss_key = NULL,
+            .rss_hf = ETH_RSS_IP 
+        }
     },
+    */
 };
 
 /*
@@ -187,6 +190,7 @@ lcore_keepalive(__attribute__((unused)) void *arg)
     /* Run until the application is quit or killed. */
     const uint8_t port0 = 1;
     for (;;) {
+        uint16_t i = 0;
         /* Receive on port0 */ 
         /* Get burst of RX packets, from first port of pair. */
         struct rte_mbuf* bufs[BURST_SIZE];
@@ -194,11 +198,11 @@ lcore_keepalive(__attribute__((unused)) void *arg)
         size_t keepalive_bufs_count = 0;
         const uint16_t nb_rx = rte_eth_rx_burst(port0, 0,
                 bufs, BURST_SIZE);
-        uint16_t i = 0;
-        time_t ts = time(NULL);
 
         if (unlikely(nb_rx == 0))
             continue;
+
+        time_t ts = time(NULL);
 
         /* Check if keepalive packet */ 
         keepalive_bufs_count = 0;
@@ -207,9 +211,9 @@ lcore_keepalive(__attribute__((unused)) void *arg)
             struct ether_hdr* ether_header = rte_pktmbuf_mtod(buf, struct ether_hdr *);
             // check if this is a keepalive packet
             if(
-                    buf->data_len == keepalive_frame_len
+                    buf->data_len >= keepalive_frame_len
                     && ether_header->ether_type == keepalive_type
-                    && is_same_ether_addr(&(ether_header->d_addr), &keepalive_addr)
+                    && is_same_ether_addr(&(ether_header->d_addr), &(keepalive_addr))
             ){
                 keepalive_bufs[keepalive_bufs_count] = buf;
                 ++keepalive_bufs_count;
@@ -253,7 +257,6 @@ lcore_keepalive(__attribute__((unused)) void *arg)
             entry->delay__ms = delay__ms;
         }
 
-
         // TODO: use sorted list
         // remove timed out entries from keepalive table
         // and get worker with minumum delay
@@ -262,25 +265,37 @@ lcore_keepalive(__attribute__((unused)) void *arg)
         struct keepalive_entry* entry = SLIST_FIRST(&(keepalives.list));
         while(entry != NULL){
             struct keepalive_entry* next = SLIST_NEXT(entry, entries);
-            if(difftime(
-                        entry->ts,
-                        ts
-            ) < keepalive_timeout){
+            double ts_diff = difftime(ts, entry->ts);
+            if( ts_diff < keepalive_timeout__s){
                 if( min_delay_entry == NULL
                     || entry->delay__ms < min_delay_entry->delay__ms){
                     min_delay_entry = entry;
                 }
             }else{
-                printf("Worker has timed out\n");
+                char worker_addr_string[18] = { '\0' };
+                ether_format_addr(worker_addr_string, 18, &(entry->addr));
+                printf(
+                    "Worker %s has timed out\n",
+                    worker_addr_string
+                );
                 SLIST_REMOVE(&(keepalives.list), entry, keepalive_entry, entries);
                 free(entry);
             }
             entry = next;
         }
-        // copy min delay entry
+
         if(min_delay_entry != NULL){
+            /* Print min delay worker */
+            char min_delay_addr_string[18] = { '\0' };
+            ether_format_addr(min_delay_addr_string, 18, &(min_delay_entry->addr));
+            printf(
+                    "Min delay: %s with %"PRIu32" ms\n",
+                    min_delay_addr_string,
+                    min_delay_entry->delay__ms
+            );
+            /* Save min delay */
             LOCK_KEEPALIVE;
-            ether_addr_copy(&(entry->addr), &(keepalives.min_delay_worker));
+            ether_addr_copy(&(min_delay_entry->addr), &(keepalives.min_delay_worker));
             UNLOCK_KEEPALIVE;
         }
 
@@ -440,7 +455,7 @@ main(int argc, char *argv[])
     if (nb_ports != 2)
         rte_exit(EXIT_FAILURE, "Error: only excatly two ports supported\n");
 
-    if (rte_lcore_count() != 2)
+    if (rte_lcore_count() < 2)
         rte_exit(EXIT_FAILURE,
                     "Error: need at least two lcore, %d given\n",
                     rte_lcore_count()
