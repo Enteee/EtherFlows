@@ -38,6 +38,7 @@
 #include <inttypes.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <arpa/inet.h> 
 
 #include <rte_eal.h>
 #include <rte_ethdev.h>
@@ -55,10 +56,10 @@
 #define BURST_SIZE 32
 
 /** Keepalive specification */
-static const double keepalive_timeout = 2f;
-static const uint16_t keepalive_frame_len = sizeof(ether_hdr) + sizeof(uint32_t);
+static const double keepalive_timeout = 2.f;
+static const uint16_t keepalive_frame_len = sizeof(struct ether_hdr) + sizeof(uint32_t);
 static const uint16_t keepalive_type = 0x9000;
-static const keepalive_addr = { .addr_bytes = {0xFF} };
+static const struct ether_addr keepalive_addr = { .addr_bytes = {0xff} };
 
 struct keepalive_entry {
     SLIST_ENTRY(keepalive_entry) entries;   /* Singly-linked List. */
@@ -69,20 +70,20 @@ struct keepalive_entry {
 
 struct keepalives {
     SLIST_HEAD(keepalive_entries, keepalive_entry) list;
-    bool min_delay_worker_elected;
     struct ether_addr min_delay_worker;
     pthread_mutex_t mutex;
-}
+};
+
 /** globals */
 static uint32_t flowgen_id;
 
 static struct keepalives keepalives = {
     .list = SLIST_HEAD_INITIALIZER(&(keepalives.list)),
-    .min_delay_worker = {0},
+    .min_delay_worker = { { 0x0 }},
 #define LOCK_KEEPALIVE (pthread_mutex_lock(&keepalives.mutex));
 #define UNLOCK_KEEPALIVE (pthread_mutex_unlock(&keepalives.mutex));
     .mutex = PTHREAD_MUTEX_INITIALIZER,
-}
+};
 
 #define UNUSED(x) (void)(x)
 
@@ -161,8 +162,8 @@ port_init(uint8_t port, struct rte_mempool *mbuf_pool)
  * The lcore keepalive. This thread does listen for keepalive messages
  * and updates the worker table accordingly.
  */
-static __attribute__((noreturn)) void
-lcore_keepalive(void)
+static __attribute__((noreturn)) int
+lcore_keepalive(__attribute__((unused)) void *arg)
 {
     const uint8_t nb_ports = rte_eth_dev_count();
     uint8_t port;
@@ -187,19 +188,19 @@ lcore_keepalive(void)
     for (;;) {
         /* Receive on port0 */ 
         /* Get burst of RX packets, from first port of pair. */
-        struct rte_mbuf *bufs[BURST_SIZE];
-        struct rte_mbuf *keepalive_bufs[BURST_SIZE];
-        size_t keepalives_bufs_count = 0;
+        struct rte_mbuf* bufs[BURST_SIZE];
+        struct rte_mbuf* keepalive_bufs[BURST_SIZE];
+        size_t keepalive_bufs_count = 0;
         const uint16_t nb_rx = rte_eth_rx_burst(port0, 0,
                 bufs, BURST_SIZE);
         uint16_t i = 0;
-        time_t ts = time();
+        time_t ts = time(NULL);
 
         if (unlikely(nb_rx == 0))
             continue;
 
         /* Check if keepalive packet */ 
-        keepalives_bufs_count = 0;
+        keepalive_bufs_count = 0;
         for(i=0;i<nb_rx;++i){
             struct rte_mbuf* buf = bufs[i];
             struct ether_hdr* ether_header = rte_pktmbuf_mtod(buf, struct ether_hdr *);
@@ -207,7 +208,7 @@ lcore_keepalive(void)
             if(
                     buf->data_len == keepalive_frame_len
                     && ether_header->ether_type == keepalive_type
-                    && is_same_ether_addr(ether_header->d_addr, &keepalive_addr)
+                    && is_same_ether_addr(&(ether_header->d_addr), &keepalive_addr)
             ){
                 keepalive_bufs[keepalive_bufs_count] = buf;
                 ++keepalive_bufs_count;
@@ -215,19 +216,18 @@ lcore_keepalive(void)
         }
 
         for(i=0;i<keepalive_bufs_count;++i){
-            size_t j;
             struct keepalive_entry* entry = NULL;
-            struct mbuf* keepalive_buf = keepalive_bufs[i];
+            struct rte_mbuf* keepalive_buf = keepalive_bufs[i];
             struct ether_hdr* ether_header = rte_pktmbuf_mtod(keepalive_buf, struct ether_hdr *);
             struct ether_addr* addr = &(ether_header->s_addr);
             // get delay in BIG endian (network byte order)
             uint32_t delay__ms = ntohl(
-                                        rte_pktmbuf_mtod(
-                                                        keepalive_buf,
-                                                        uint32_t,
-                                                        sizeof(ether_hdr)
+                                        rte_pktmbuf_mtod_offset(
+                                                                keepalive_buf,
+                                                                uint32_t,
+                                                                sizeof(struct ether_hdr)
                                         )
-                                    )
+                                    );
             // TODO: faster lookup
             // check if addr exists in keepalive table
             entry = SLIST_FIRST(&(keepalives.list));
@@ -244,7 +244,7 @@ lcore_keepalive(void)
 
             if(entry == NULL){
                 // entry not found:
-                entry = calloc(1,sizeof(keepalive_entry));
+                entry = calloc(1,sizeof(struct keepalive_entry));
                 ether_addr_copy(addr, &(entry->addr));
                 SLIST_INSERT_HEAD(&(keepalives.list), entry, entries);
             }
@@ -258,21 +258,21 @@ lcore_keepalive(void)
         // remove timed out entries from keepalive table
         // and get worker with minumum delay
         struct keepalive_entry* min_delay_entry = NULL;
-        keepalives.min_delay_worker = {0x0};
-        keepalive_entry* entry = SLIST_FIRST(&(keepalives.list));
+        memset(&(keepalives.min_delay_worker), 0x0, sizeof(struct ether_addr));
+        struct keepalive_entry* entry = SLIST_FIRST(&(keepalives.list));
         while(entry != NULL){
-            keepalive_entry* next = SLIST_NEXT(entry, entries);
+            struct keepalive_entry* next = SLIST_NEXT(entry, entries);
             if(difftime(
                         entry->ts,
                         ts
             ) < keepalive_timeout){
                 if( min_delay_entry == NULL
-                    || entry->delay < min_delay_entry->delay){
+                    || entry->delay__ms < min_delay_entry->delay__ms){
                     min_delay_entry = entry;
                 }
             }else{
                 printf("Worker has timed out\n");
-                LIST_REMOVE(&(keepalives.list), entry, keepalive_entry, entries);
+                SLIST_REMOVE(&(keepalives.list), entry, keepalive_entry, entries);
                 free(entry);
             }
             entry = next;
@@ -280,7 +280,7 @@ lcore_keepalive(void)
         // copy min delay entry
         if(min_delay_entry != NULL){
             LOCK_KEEPALIVE;
-            ether_addr_copy(&(entry->addr), keepalives.min_delay_worker);
+            ether_addr_copy(&(entry->addr), &(keepalives.min_delay_worker));
             UNLOCK_KEEPALIVE;
         }
 
@@ -335,14 +335,14 @@ lcore_forward(void)
 
         if(unlikely(is_zero_ether_addr(&(keepalives.min_delay_worker)))){
             printf("WARNING, no workers registered yet:"
-                    "will discard %"PRIu16" packets\n");
+                    "will discard %"PRIu16" packets\n", nb_rx);
             UNLOCK_KEEPALIVE;
             continue;
         }
 
         // send all packets to first worker
         struct ether_addr dst_addr;
-        ether_addr_copy(&(keepalives.min_delay->addr), &(dst_addr));
+        ether_addr_copy(&(keepalives.min_delay_worker), &(dst_addr));
 
         UNLOCK_KEEPALIVE;
 
