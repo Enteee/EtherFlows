@@ -164,8 +164,7 @@ class Worker():
         frame['env']['delay']['raw'] = Worker.delay.seconds + Worker.delay.microseconds * (10 ** -9)
         if not args.standalone:
             frame['env']['flowgen'] = "0x{3}{4}{5}".format(
-                        frame['eth']['src']['raw'].split(':')
-                    )
+                    *frame['eth']['src']['raw'].split(':'))
 
         # Write frame 
         try:
@@ -187,13 +186,11 @@ class Worker():
                            + Worker.delay.microseconds * (10 ** -9)
                 # send keep alive frame
                 ka_frame = bytes.fromhex(args.broadcast_mac.replace(':','')) # dst MAC
-                print("{}".format(ka_frame))
                 ka_frame += bytes.fromhex(Worker.mac.replace(':','')) # src MAC
                 ka_frame += b'\x09\x00' # ethertype 
-                ka_frame += b'ENTE'
-                # ka_frame += struct.pack(">I", flow_delay) # payload
-                # TODO: calc checksum... 
-                ka_frame += b'\x63\x07\x3d\x02' # checksum
+                 ka_frame += struct.pack(">I", flow_delay) # payload
+                crc = binascii.crc32(ka_frame) & 0xffffffff
+                ka_frame += struct.pack("I", crc) # checksum
                 raw_socket.send(ka_frame)
                 time.sleep(1)
 
