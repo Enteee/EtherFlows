@@ -37,6 +37,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 #include <rte_eal.h>
 #include <rte_ethdev.h>
@@ -53,25 +54,51 @@
 #define MBUF_CACHE_SIZE 250
 #define BURST_SIZE 32
 
+/** Keepalive specification */
+static const double keepalive_timeout = 2f;
+static const uint16_t keepalive_frame_len = sizeof(ether_hdr) + sizeof(uint32_t);
+static const uint16_t keepalive_type = 0x9000;
+static const keepalive_addr = { .addr_bytes = {0xFF} };
+
+struct keepalive_entry {
+    SLIST_ENTRY(keepalive_entry) entries;   /* Singly-linked List. */
+    struct ether_addr addr;                 /**< mac of worker */
+    time_t ts;                              /**< timestamp of entry */
+    uint32_t delay__ms;                     /**< delay of worker in milliseconds */
+};
+
+struct keepalives {
+    SLIST_HEAD(keepalive_entries, keepalive_entry) list;
+    bool min_delay_worker_elected;
+    struct ether_addr min_delay_worker;
+    pthread_mutex_t mutex;
+}
+/** globals */
+static uint32_t flowgen_id;
+
+static struct keepalives keepalives = {
+    .list = SLIST_HEAD_INITIALIZER(&(keepalives.list)),
+    .min_delay_worker = {0},
+#define LOCK_KEEPALIVE (pthread_mutex_lock(&keepalives.mutex));
+#define UNLOCK_KEEPALIVE (pthread_mutex_unlock(&keepalives.mutex));
+    .mutex = PTHREAD_MUTEX_INITIALIZER,
+}
+
 #define UNUSED(x) (void)(x)
 
 static const char *ARG_KEYS[] = {"id"};
 
 static const struct rte_eth_conf port_conf_default = {
-	.rxmode = {
-		.mq_mode = ETH_MQ_RX_RSS,
-		.max_rx_pkt_len = ETHER_MAX_LEN 
-	},
-	.rx_adv_conf = { .rss_conf = { 
-		.rss_key = NULL,
-		.rss_hf = ETH_RSS_IP 
-		}
-	},
+    .rxmode = {
+        .mq_mode = ETH_MQ_RX_RSS,
+        .max_rx_pkt_len = ETHER_MAX_LEN 
+    },
+    .rx_adv_conf = { .rss_conf = { 
+        .rss_key = NULL,
+        .rss_hf = ETH_RSS_IP 
+    }
+    },
 };
-
-static uint32_t flowgen_id;
-
-/* basicfwd.c: Basic DPDK skeleton forwarding example. */
 
 /*
  * Initializes a given port using global settings and with the RX buffers
@@ -80,54 +107,189 @@ static uint32_t flowgen_id;
 static inline int
 port_init(uint8_t port, struct rte_mempool *mbuf_pool)
 {
-	struct rte_eth_conf port_conf = port_conf_default;
-	const uint16_t rx_rings = 1, tx_rings = 1;
-	int retval;
-	uint16_t q;
+    struct rte_eth_conf port_conf = port_conf_default;
+    const uint16_t rx_rings = 1, tx_rings = 1;
+    int retval;
+    uint16_t q;
 
-	if (port >= rte_eth_dev_count())
-		return -1;
+    if (port >= rte_eth_dev_count())
+        return -1;
 
-	/* Configure the Ethernet device. */
-	retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);
-	if (retval != 0)
-		return retval;
+    /* Configure the Ethernet device. */
+    retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);
+    if (retval != 0)
+        return retval;
 
-	/* Allocate and set up 1 RX queue per Ethernet port. */
-	for (q = 0; q < rx_rings; q++) {
-		retval = rte_eth_rx_queue_setup(port, q, RX_RING_SIZE,
-				rte_eth_dev_socket_id(port), NULL, mbuf_pool);
-		if (retval < 0)
-			return retval;
-	}
+    /* Allocate and set up 1 RX queue per Ethernet port. */
+    for (q = 0; q < rx_rings; q++) {
+        retval = rte_eth_rx_queue_setup(port, q, RX_RING_SIZE,
+                rte_eth_dev_socket_id(port), NULL, mbuf_pool);
+        if (retval < 0)
+            return retval;
+    }
 
-	/* Allocate and set up 1 TX queue per Ethernet port. */
-	for (q = 0; q < tx_rings; q++) {
-		retval = rte_eth_tx_queue_setup(port, q, TX_RING_SIZE,
-				rte_eth_dev_socket_id(port), NULL);
-		if (retval < 0)
-			return retval;
-	}
+    /* Allocate and set up 1 TX queue per Ethernet port. */
+    for (q = 0; q < tx_rings; q++) {
+        retval = rte_eth_tx_queue_setup(port, q, TX_RING_SIZE,
+                rte_eth_dev_socket_id(port), NULL);
+        if (retval < 0)
+            return retval;
+    }
 
-	/* Start the Ethernet port. */
-	retval = rte_eth_dev_start(port);
-	if (retval < 0)
-		return retval;
+    /* Start the Ethernet port. */
+    retval = rte_eth_dev_start(port);
+    if (retval < 0)
+        return retval;
 
-	/* Display the port MAC address. */
-	struct ether_addr addr;
-	rte_eth_macaddr_get(port, &addr);
-	printf("Port %u MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8
-			   " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 "\n",
-			(unsigned)port,
-			addr.addr_bytes[0], addr.addr_bytes[1],
-			addr.addr_bytes[2], addr.addr_bytes[3],
-			addr.addr_bytes[4], addr.addr_bytes[5]);
+    /* Display the port MAC address. */
+    struct ether_addr addr;
+    rte_eth_macaddr_get(port, &addr);
+    printf("Port %u MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8
+            " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 "\n",
+            (unsigned)port,
+            addr.addr_bytes[0], addr.addr_bytes[1],
+            addr.addr_bytes[2], addr.addr_bytes[3],
+            addr.addr_bytes[4], addr.addr_bytes[5]);
 
-	/* Enable RX in promiscuous mode for the Ethernet device. */
-	rte_eth_promiscuous_enable(port);
+    /* Enable RX in promiscuous mode for the Ethernet device. */
+    rte_eth_promiscuous_enable(port);
 
-	return 0;
+    return 0;
+}
+
+/*
+ * The lcore keepalive. This thread does listen for keepalive messages
+ * and updates the worker table accordingly.
+ */
+static __attribute__((noreturn)) void
+lcore_keepalive(void)
+{
+    const uint8_t nb_ports = rte_eth_dev_count();
+    uint8_t port;
+
+    /*
+     * Check that the port is on the same NUMA node as the polling thread
+     * for best performance.
+    */
+    for (port = 0; port < nb_ports; port++)
+        if (rte_eth_dev_socket_id(port) > 0 &&
+                rte_eth_dev_socket_id(port) !=
+                (int)rte_socket_id())
+            printf("WARNING, port %u is on remote NUMA node to "
+                    "polling thread.\n\tPerformance will "
+                    "not be optimal.\n", port);
+
+    printf("\nCore %u listening for keepalives. [Ctrl+C to quit]\n",
+            rte_lcore_id());
+
+    /* Run until the application is quit or killed. */
+    const uint8_t port0 = 1;
+    for (;;) {
+        /* Receive on port0 */ 
+        /* Get burst of RX packets, from first port of pair. */
+        struct rte_mbuf *bufs[BURST_SIZE];
+        struct rte_mbuf *keepalive_bufs[BURST_SIZE];
+        size_t keepalives_bufs_count = 0;
+        const uint16_t nb_rx = rte_eth_rx_burst(port0, 0,
+                bufs, BURST_SIZE);
+        uint16_t i = 0;
+        time_t ts = time();
+
+        if (unlikely(nb_rx == 0))
+            continue;
+
+        /* Check if keepalive packet */ 
+        keepalives_bufs_count = 0;
+        for(i=0;i<nb_rx;++i){
+            struct rte_mbuf* buf = bufs[i];
+            struct ether_hdr* ether_header = rte_pktmbuf_mtod(buf, struct ether_hdr *);
+            // check if this is a keepalive packet
+            if(
+                    buf->data_len == keepalive_frame_len
+                    && ether_header->ether_type == keepalive_type
+                    && is_same_ether_addr(ether_header->d_addr, &keepalive_addr)
+            ){
+                keepalive_bufs[keepalive_bufs_count] = buf;
+                ++keepalive_bufs_count;
+            }
+        }
+
+        for(i=0;i<keepalive_bufs_count;++i){
+            size_t j;
+            struct keepalive_entry* entry = NULL;
+            struct mbuf* keepalive_buf = keepalive_bufs[i];
+            struct ether_hdr* ether_header = rte_pktmbuf_mtod(keepalive_buf, struct ether_hdr *);
+            struct ether_addr* addr = &(ether_header->s_addr);
+            // get delay in BIG endian (network byte order)
+            uint32_t delay__ms = ntohl(
+                                        rte_pktmbuf_mtod(
+                                                        keepalive_buf,
+                                                        uint32_t,
+                                                        sizeof(ether_hdr)
+                                        )
+                                    )
+            // TODO: faster lookup
+            // check if addr exists in keepalive table
+            entry = SLIST_FIRST(&(keepalives.list));
+            while(entry != NULL){
+                if(is_same_ether_addr(
+                        &(entry->addr),
+                        addr
+                )){
+                    // entry found
+                    break;
+                }
+                entry = SLIST_NEXT(entry, entries);
+            }
+
+            if(entry == NULL){
+                // entry not found:
+                entry = calloc(1,sizeof(keepalive_entry));
+                ether_addr_copy(addr, &(entry->addr));
+                SLIST_INSERT_HEAD(&(keepalives.list), entry, entries);
+            }
+            // update timer & delay
+            entry->ts = ts;
+            entry->delay__ms = delay__ms;
+        }
+
+
+        // TODO: use sorted list
+        // remove timed out entries from keepalive table
+        // and get worker with minumum delay
+        struct keepalive_entry* min_delay_entry = NULL;
+        keepalives.min_delay_worker = {0x0};
+        keepalive_entry* entry = SLIST_FIRST(&(keepalives.list));
+        while(entry != NULL){
+            keepalive_entry* next = SLIST_NEXT(entry, entries);
+            if(difftime(
+                        entry->ts,
+                        ts
+            ) < keepalive_timeout){
+                if( min_delay_entry == NULL
+                    || entry->delay < min_delay_entry->delay){
+                    min_delay_entry = entry;
+                }
+            }else{
+                printf("Worker has timed out\n");
+                LIST_REMOVE(&(keepalives.list), entry, keepalive_entry, entries);
+                free(entry);
+            }
+            entry = next;
+        }
+        // copy min delay entry
+        if(min_delay_entry != NULL){
+            LOCK_KEEPALIVE;
+            ether_addr_copy(&(entry->addr), keepalives.min_delay_worker);
+            UNLOCK_KEEPALIVE;
+        }
+
+        for(i=0;i<nb_rx;++i){
+            /* Free any unsent packets. */
+            rte_pktmbuf_free(bufs[i]);
+        }
+
+    }
 }
 
 /*
@@ -135,83 +297,93 @@ port_init(uint8_t port, struct rte_mempool *mbuf_pool)
  * an input port and writing to an output port.
  */
 static __attribute__((noreturn)) void
-lcore_main(void)
+lcore_forward(void)
 {
-	const uint8_t nb_ports = rte_eth_dev_count();
-	uint8_t port;
+    const uint8_t nb_ports = rte_eth_dev_count();
+    uint8_t port;
 
-	/*
-	 * Check that the port is on the same NUMA node as the polling thread
-	 * for best performance.
-	 */
-	for (port = 0; port < nb_ports; port++)
-		if (rte_eth_dev_socket_id(port) > 0 &&
-				rte_eth_dev_socket_id(port) !=
-						(int)rte_socket_id())
-			printf("WARNING, port %u is on remote NUMA node to "
-					"polling thread.\n\tPerformance will "
-					"not be optimal.\n", port);
+    /*
+     * Check that the port is on the same NUMA node as the polling thread
+     * for best performance.
+   */
+    for (port = 0; port < nb_ports; port++)
+        if (rte_eth_dev_socket_id(port) > 0 &&
+                rte_eth_dev_socket_id(port) !=
+                (int)rte_socket_id())
+            printf("WARNING, port %u is on remote NUMA node to "
+                    "polling thread.\n\tPerformance will "
+                    "not be optimal.\n", port);
 
-	printf("\nCore %u forwarding packets. [Ctrl+C to quit]\n",
-			rte_lcore_id());
+    printf("\nCore %u forwarding packets. [Ctrl+C to quit]\n",
+            rte_lcore_id());
 
-	/* Run until the application is quit or killed. */
-	const uint8_t port0 = 0;
-	const uint8_t port1 = 1;
-	for (;;) {
-		/* Receive on port0 and forward to port1 */
-		/* Get burst of RX packets, from first port of pair. */
-		struct rte_mbuf *bufs[BURST_SIZE];
-		const uint16_t nb_rx = rte_eth_rx_burst(port0, 0,
-				bufs, BURST_SIZE);
-		uint16_t i = 0;
+    /* Run until the application is quit or killed. */
+    const uint8_t port0 = 0;
+    const uint8_t port1 = 1;
+    for (;;) {
+        /* Receive on port0 and forward to port1 */
+        /* Get burst of RX packets, from first port of pair. */
+        struct rte_mbuf *bufs[BURST_SIZE];
+        const uint16_t nb_rx = rte_eth_rx_burst(port0, 0,
+                bufs, BURST_SIZE);
+        uint16_t i = 0;
 
-		if (unlikely(nb_rx == 0))
-			continue;
+        if(unlikely(nb_rx <= 0))
+            continue;
 
-		/* Set flow hash as destination address */
-		for(i=0;i<nb_rx;++i){
-			struct ether_hdr* ether_header = rte_pktmbuf_mtod(bufs[i], struct ether_hdr *);
-			/** Set flow information */
-			ether_header->d_addr.addr_bytes[0] = 0xBE;
-			ether_header->d_addr.addr_bytes[1] = 0xEF;
-			ether_header->d_addr.addr_bytes[2] = ((uint8_t*)&bufs[i]->hash.rss)[0];
-			ether_header->d_addr.addr_bytes[3] = ((uint8_t*)&bufs[i]->hash.rss)[1];
-			ether_header->d_addr.addr_bytes[4] = ((uint8_t*)&bufs[i]->hash.rss)[2];
-			ether_header->d_addr.addr_bytes[5] = ((uint8_t*)&bufs[i]->hash.rss)[3];
-			/** 
-			* Set source adress 
-			* 3 bytes: flow gen identifier
-			* 3 bytes: flow gen instance
-			*/
-			ether_header->s_addr.addr_bytes[0] = 0xBA;
-			ether_header->s_addr.addr_bytes[1] = 0xDA;
-			ether_header->s_addr.addr_bytes[2] = 0x55;
+        LOCK_KEEPALIVE;
 
-			ether_header->s_addr.addr_bytes[3] = (uint8_t)( (flowgen_id >> 16) & 0xff);
-			ether_header->s_addr.addr_bytes[4] = (uint8_t)( (flowgen_id >> 8) & 0xff);
-			ether_header->s_addr.addr_bytes[5] = (uint8_t)(flowgen_id & 0xff);
-		}
+        if(unlikely(is_zero_ether_addr(&(keepalives.min_delay_worker)))){
+            printf("WARNING, no workers registered yet:"
+                    "will discard %"PRIu16" packets\n");
+            UNLOCK_KEEPALIVE;
+            continue;
+        }
 
-		/* Send burst of TX packets, to second port of pair. */
-		const uint16_t nb_tx = rte_eth_tx_burst(port1, 0,
-				bufs, nb_rx);
+        // send all packets to first worker
+        struct ether_addr dst_addr;
+        ether_addr_copy(&(keepalives.min_delay->addr), &(dst_addr));
 
-		/* Free any unsent packets. */
-		if (unlikely(nb_tx < nb_rx)) {
-			uint16_t buf;
-			for (buf = nb_tx; buf < nb_rx; buf++)
-				rte_pktmbuf_free(bufs[buf]);
-		}
-	}
+        UNLOCK_KEEPALIVE;
+
+        for(i=0;i<nb_rx;++i){
+            struct ether_hdr* ether_header = rte_pktmbuf_mtod(bufs[i], struct ether_hdr *);
+            /** Set worker destination */
+            ether_addr_copy(&(dst_addr), &(ether_header->d_addr));
+
+            /** 
+             * Set source adress 
+             * 3 bytes: flow gen identifier
+             * 3 bytes: flow gen instance
+            */
+            ether_header->s_addr.addr_bytes[0] = 0xBA;
+            ether_header->s_addr.addr_bytes[1] = 0xDA;
+            ether_header->s_addr.addr_bytes[2] = 0x55;
+
+            ether_header->s_addr.addr_bytes[3] = (uint8_t)( (flowgen_id >> 16) & 0xff);
+            ether_header->s_addr.addr_bytes[4] = (uint8_t)( (flowgen_id >> 8) & 0xff);
+            ether_header->s_addr.addr_bytes[5] = (uint8_t)(flowgen_id & 0xff);
+        }
+
+        /* Send burst of TX packets, to second port of pair. */
+        const uint16_t nb_tx = rte_eth_tx_burst(port1, 0,
+                bufs, nb_rx);
+
+        /* Free any unsent packets. */
+        if (unlikely(nb_tx < nb_rx)) {
+            uint16_t buf;
+            for (buf = nb_tx; buf < nb_rx; buf++)
+                rte_pktmbuf_free(bufs[buf]);
+        }
+    }
 }
 
 static int handle_id_arg(const char *key, const char *value, void *opaque){
-	UNUSED(opaque);
-	if(strncmp(key, ARG_KEYS[0], strlen(key)) == 0){
-		flowgen_id = strtol(value, NULL, 0); 
-	}
-	return 0;
+    UNUSED(opaque);
+    if(strncmp(key, ARG_KEYS[0], strlen(key)) == 0){
+        flowgen_id = strtol(value, NULL, 0); 
+    }
+    return 0;
 }
 
 /*
@@ -221,71 +393,71 @@ static int handle_id_arg(const char *key, const char *value, void *opaque){
 int
 main(int argc, char *argv[])
 {
-	struct rte_kvargs* kvargs;
-	struct rte_mempool *mbuf_pool;
-	unsigned nb_ports;
-	uint8_t portid;
+    struct rte_kvargs* kvargs;
+    struct rte_mempool *mbuf_pool;
+    unsigned nb_ports;
+    uint8_t portid;
 
 
-	/* Generate random flowgen id */
-	srand(time(NULL));
-	flowgen_id = (uint32_t)rand();
+    /* Generate random flowgen id */
+    srand(time(NULL));
+    flowgen_id = (uint32_t)rand();
 
-	/* Initialize the Environment Abstraction Layer (EAL). */
-	int ret = rte_eal_init(argc, argv);
-	if (ret < 0)
-		rte_exit(EXIT_FAILURE, "Error with EAL initialization\n");
+    /* Initialize the Environment Abstraction Layer (EAL). */
+    int ret = rte_eal_init(argc, argv);
+    if (ret < 0)
+        rte_exit(EXIT_FAILURE, "Error with EAL initialization\n");
 
-	argc -= ret;
-	argv += ret;
+    argc -= ret;
+    argv += ret;
 
-	if(argc == 2){
-		kvargs = rte_kvargs_parse (
-			argv[1],
-			ARG_KEYS
-		);
+    if(argc == 2){
+        kvargs = rte_kvargs_parse (
+                argv[1],
+                ARG_KEYS
+                );
 
-		if(kvargs == NULL)
-			rte_exit(EXIT_FAILURE, "Argument parsing faled\n");
+        if(kvargs == NULL)
+            rte_exit(EXIT_FAILURE, "Argument parsing faled\n");
 
-		ret = rte_kvargs_process (
-			kvargs,
-			ARG_KEYS[0],
-			handle_id_arg,
-			NULL 
-		);
+        ret = rte_kvargs_process (
+                kvargs,
+                ARG_KEYS[0],
+                handle_id_arg,
+                NULL 
+                );
 
-		if(ret < 0) 
-			rte_exit(EXIT_FAILURE, "Argument processing failed\n");
-	} else if(argc > 2){
-		rte_exit(EXIT_FAILURE, "Too many arguments\n");
-	}
+        if(ret < 0) 
+            rte_exit(EXIT_FAILURE, "Argument processing failed\n");
+    } else if(argc > 2){
+        rte_exit(EXIT_FAILURE, "Too many arguments\n");
+    }
 
-	printf("Flowgen id: %u\n", flowgen_id);
+    printf("Flowgen id: %u\n", flowgen_id);
 
-	/* Check that there is an even number of ports to send/receive on. */
-	nb_ports = rte_eth_dev_count();
-	if (nb_ports < 2 || (nb_ports & 1))
-		rte_exit(EXIT_FAILURE, "Error: number of ports must be even\n");
+    /* Check that there is an even number of ports to send/receive on. */
+    nb_ports = rte_eth_dev_count();
+    if (nb_ports < 2 || (nb_ports & 1))
+        rte_exit(EXIT_FAILURE, "Error: number of ports must be even\n");
 
-	/* Creates a new mempool in memory to hold the mbufs. */
-	mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
-		MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+    /* Creates a new mempool in memory to hold the mbufs. */
+    mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
+            MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
 
-	if (mbuf_pool == NULL)
-		rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
+    if (mbuf_pool == NULL)
+        rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
 
-	/* Initialize all ports. */
-	for (portid = 0; portid < nb_ports; portid++)
-		if (port_init(portid, mbuf_pool) != 0)
-			rte_exit(EXIT_FAILURE, "Cannot init port %"PRIu8 "\n",
-					portid);
+    /* Initialize all ports. */
+    for (portid = 0; portid < nb_ports; portid++)
+        if (port_init(portid, mbuf_pool) != 0)
+            rte_exit(EXIT_FAILURE, "Cannot init port %"PRIu8 "\n",
+                    portid);
 
-	if (rte_lcore_count() > 1)
-		printf("\nWARNING: Too many lcores enabled. Only 1 used.\n");
+    if (rte_lcore_count() > 2)
+        printf("\nWARNING: Too many lcores enabled. Only 2 used.\n");
 
-	/* Call lcore_main on the master core only. */
-	lcore_main();
+    /* Call lcore_main on the master core only. */
+    lcore_forward();
 
-	return 0;
+    return 0;
 }
