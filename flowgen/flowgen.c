@@ -441,7 +441,10 @@ main(int argc, char *argv[])
         rte_exit(EXIT_FAILURE, "Error: only excatly two ports supported\n");
 
     if (rte_lcore_count() != 2)
-        rte_exit(EXIT_FAILURE, "Error: need at least two lcore\n");
+        rte_exit(EXIT_FAILURE,
+                    "Error: need at least two lcore, %d given\n",
+                    rte_lcore_count()
+        );
 
     /* Creates a new mempool in memory to hold the mbufs. */
     mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
