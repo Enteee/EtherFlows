@@ -188,7 +188,7 @@ class Worker():
                 ka_frame = bytes.fromhex(args.broadcast_mac.replace(':','')) # dst MAC
                 ka_frame += bytes.fromhex(Worker.mac.replace(':','')) # src MAC
                 ka_frame += b'\x09\x00' # ethertype 
-                 ka_frame += struct.pack(">I", flow_delay) # payload
+                ka_frame += struct.pack(">I", flow_delay) # payload
                 crc = binascii.crc32(ka_frame) & 0xffffffff
                 ka_frame += struct.pack("I", crc) # checksum
                 raw_socket.send(ka_frame)
