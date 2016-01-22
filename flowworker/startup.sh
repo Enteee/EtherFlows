@@ -55,7 +55,7 @@ function flowworker_args() {
     # Write pcap-filter
     if ${STANDALONE}; then
         # Standalone: run in standalone mode
-        echo "-S -t0"
+        echo "-S"
     fi
 }
 
@@ -118,6 +118,10 @@ elif [ -n "${PCAP_FILE}" ] && [ -n "${SNIFFING_INTERFACE}" ]; then
     exit 1
 fi
 
+if [ "${UNAME}" == "Darwin" ]; then 
+    echo "OS X not supported!"
+    exit 1
+fi
 if [ -n "${SNIFFING_INTERFACE}" ]; then
     if ! ip link show "${SNIFFING_INTERFACE}" &>/dev/null; then
         echo "Invalid sniffing interface: ${SNIFFING_INTERFACE}"
