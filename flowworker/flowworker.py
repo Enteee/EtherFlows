@@ -199,10 +199,11 @@ class Worker():
 
     def send_keep_alive(self):
         while(running):
-            act_time = datetime.datetime.now(TIMEZONE)
-            curr_delay = act_time - Worker.last_frame
-            if curr_delay >= datetime.timedelta(seconds=args.timeout):
-                Worker.delay = datetime.timedelta(seconds=0)
+            if Worker.last_frame is not None:
+                act_time = datetime.datetime.now(TIMEZONE)
+                curr_delay = act_time - Worker.last_frame
+                if curr_delay >= datetime.timedelta(seconds=args.timeout):
+                    Worker.delay = datetime.timedelta(seconds=0)
 
             worker_delay = Worker.delay.seconds * (10 ** 3)\
                        + Worker.delay.microseconds // (10 ** 3)
