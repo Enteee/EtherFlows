@@ -59,6 +59,8 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 ### Flow Worker
 * [python3][python3]
  * [python-pytz][python-pytz]
+ * [netifaces][netifaces]
+ 
 
 [flowgen]:flowgen/flowgen.c
 [flowworker]:flowworker/flowworker.py
@@ -66,6 +68,7 @@ With a mapping of RSS-generated flow hashes into MAC address-space we can achive
 [dpdk]:http://dpdk.org/
 [python3]:https://www.python.org
 [python-pytz]:http://pytz.sourceforge.net/
+[netifaces]:https://pypi.python.org/pypi/netifaces
 [docker-compose]:https://docs.docker.com/compose/
 [docker]:https://www.docker.com/
 [irc]:http://webchat.freenode.net/?nick=newEtherFlowsUser&channels=EtherFlows
