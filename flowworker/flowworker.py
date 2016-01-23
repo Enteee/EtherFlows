@@ -27,6 +27,7 @@ LOGSTASH_CONNECT_PORT = '5000'
 LOGSTASH_CONNECT = '127.0.0.1:{}'.format(LOGSTASH_CONNECT_PORT)
 BROADCAST_MAC = 'FF:FF:FF:FF:FF:FF'
 TIMEZONE = pytz.timezone(time.tzname[0])
+TIMEOUT = 3
 
 # Main thread is running
 running = True
@@ -55,6 +56,12 @@ parser.add_argument('-l',
                     type=int,
                     dest='data_maxlen',
                     help='Maximum lenght of data in tshark pdml-field [default: {}]'.format(DATA_MAXLEN)
+                    )
+parser.add_argument('-t',
+                    default=TIMEOUT,
+                    type=int,
+                    dest='timeout',
+                    help='Length in seconds after worker delay resets'
                     )
 parser.add_argument('-d',
                     default=DEBUG,
@@ -145,6 +152,7 @@ class Worker():
     """ MAC address of flowworker instance"""
     mac = "00:00:00:00:00:00"
     delay = datetime.timedelta()
+    last_frame = None
     raw_socket = None
 
     def __init__(self):
@@ -164,6 +172,7 @@ class Worker():
         # Get times
         capture_timestamp = datetime.datetime.fromtimestamp(frame['frame']['time_epoch']['raw'], TIMEZONE)
         processed_timestamp = datetime.datetime.now(TIMEZONE)
+        Worker.last_frame = capture_timestamp
         Worker.delay = processed_timestamp - capture_timestamp
         if args.debug:
             print("Frame delay: {}".format(Worker.delay))
@@ -190,6 +199,11 @@ class Worker():
 
     def send_keep_alive(self):
         while(running):
+            act_time = datetime.datetime.now(TIMEZONE)
+            curr_delay = act_time - Worker.last_frame
+            if curr_delay >= datetime.timedelta(seconds=args.timeout):
+                Worker.delay = datetime.timedelta(seconds=0)
+
             worker_delay = Worker.delay.seconds * (10 ** 3)\
                        + Worker.delay.microseconds // (10 ** 3)
             if args.debug:
