@@ -27,6 +27,7 @@ LOGSTASH_CONNECT_PORT = '5000'
 LOGSTASH_CONNECT = '127.0.0.1:{}'.format(LOGSTASH_CONNECT_PORT)
 BROADCAST_MAC = 'FF:FF:FF:FF:FF:FF'
 TIMEZONE = pytz.timezone(time.tzname[0])
+TIMEOUT = 3
 
 # Main thread is running
 running = True
@@ -55,6 +56,12 @@ parser.add_argument('-l',
                     type=int,
                     dest='data_maxlen',
                     help='Maximum lenght of data in tshark pdml-field [default: {}]'.format(DATA_MAXLEN)
+                    )
+parser.add_argument('-t',
+                    default=TIMEOUT,
+                    type=int,
+                    dest='timeout',
+                    help='Length in seconds after worker delay resets'
                     )
 parser.add_argument('-d',
                     default=DEBUG,
@@ -145,14 +152,15 @@ class Worker():
     """ MAC address of flowworker instance"""
     mac = "00:00:00:00:00:00"
     delay = datetime.timedelta()
+    last_frame_processed_timestamp = None
     raw_socket = None
 
     def __init__(self):
         # Get mac address of interface
         addrs = netifaces.ifaddresses(args.interface)
         Worker.mac = "{}".format(
-                addrs[netifaces.AF_LINK][0]['addr']
-                )
+            addrs[netifaces.AF_LINK][0]['addr']
+        )
         # bind raw socket
         if not args.standalone:
             Worker.raw_socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
@@ -162,21 +170,21 @@ class Worker():
 
     def write_frame(self, frame):
         # Get times
+        Worker.last_frame_processed_timestamp = datetime.datetime.now(TIMEZONE)
         capture_timestamp = datetime.datetime.fromtimestamp(frame['frame']['time_epoch']['raw'], TIMEZONE)
-        processed_timestamp = datetime.datetime.now(TIMEZONE)
-        Worker.delay = processed_timestamp - capture_timestamp
+        Worker.delay = Worker.last_frame_processed_timestamp - capture_timestamp
         if args.debug:
             print("Frame delay: {}".format(Worker.delay))
-        # Set environment information to packet
+        # Set environment information of frame
         frame['@timestamp'] = capture_timestamp.isoformat()
         frame['env']['hostname']['raw'] = HOSTNAME
         frame['env']['interface']['raw'] = args.interface
-        frame['env']['processed']['raw'] = processed_timestamp.isoformat()
+        frame['env']['processed']['raw'] = Worker.last_frame_processed_timestamp.isoformat()
         frame['env']['delay']['raw'] = Worker.delay.seconds + Worker.delay.microseconds * (10 ** -6)
         if not args.standalone:
             frame['env']['flowgen'] = "0x{3}{4}{5}".format(
-                    *frame['eth']['src']['raw'].split(':'))
-
+                    *frame['eth']['src']['raw'].split(':')
+            )
         # Write frame 
         try:
             log_socket.send(json.dumps(frame).encode('utf-8'))
@@ -190,6 +198,12 @@ class Worker():
 
     def send_keep_alive(self):
         while(running):
+            if Worker.last_frame_processed_timestamp is not None:
+                act_time = datetime.datetime.now(TIMEZONE)
+                curr_delay = act_time - Worker.last_frame_processed_timestamp
+                if curr_delay >= datetime.timedelta(seconds=args.timeout):
+                    Worker.delay = datetime.timedelta()
+
             worker_delay = Worker.delay.seconds * (10 ** 3)\
                        + Worker.delay.microseconds // (10 ** 3)
             if args.debug:
